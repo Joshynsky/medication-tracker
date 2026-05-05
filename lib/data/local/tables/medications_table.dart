@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import 'patients_table.dart';
 
 class Medications extends Table {
   IntColumn get id => integer().autoIncrement()();
@@ -6,7 +7,7 @@ class Medications extends Table {
   TextColumn get name => text()();
   TextColumn get dosage => text()();
   TextColumn get photoPath => text().nullable()();
-  TextColumn get scheduleType => text()(); // 'once_daily', 'multiple_times', 'interval', 'custom'
+  TextColumn get scheduleType => text()();
   DateTimeColumn get startDateTime => dateTime()();
   IntColumn get totalPills => integer()();
   IntColumn get pillsRemaining => integer()();

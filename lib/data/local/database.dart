@@ -24,7 +24,15 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+    onUpgrade: (m, from, to) async {
+      // Delete all tables and recreate since we have no user data
+      await m.deleteAll();
+    },
+  );
 
   static QueryExecutor _openConnection() {
     return LazyDatabase(() async {

@@ -6,5 +6,6 @@ class Users extends Table {
   TextColumn get email => text().nullable()();
   TextColumn get accountType => text()(); // 'personal' or 'caregiver'
   TextColumn get supabaseId => text().nullable()();
+  BoolColumn get hasSeenOnboarding => boolean().withDefault(const Constant(false))();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 }

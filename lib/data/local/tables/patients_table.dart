@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import 'users_table.dart';
 
 class Patients extends Table {
   IntColumn get id => integer().autoIncrement()();
