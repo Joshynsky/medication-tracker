@@ -1,8 +1,9 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
-import 'dart:io';
 import 'tables/users_table.dart';
 import 'tables/patients_table.dart';
 import 'tables/medications_table.dart';
@@ -29,12 +30,16 @@ class AppDatabase extends _$AppDatabase {
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onUpgrade: (m, from, to) async {
-      // Delete all tables and recreate since we have no user data
-      await m.deleteAll();
+      for (final table in allTables) {
+        await m.deleteTable(table.actualTableName);
+      }
     },
   );
 
   static QueryExecutor _openConnection() {
+    if (kIsWeb) {
+      return WebDatabase('meditrack');
+    }
     return LazyDatabase(() async {
       final dbFolder = await getApplicationDocumentsDirectory();
       final file = File(p.join(dbFolder.path, 'meditrack.sqlite'));

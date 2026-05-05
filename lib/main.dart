@@ -7,7 +7,10 @@ void main() {
   
   runApp(
     const ProviderScope(
-      child: MeditrackApp(),
+      child: Directionality(
+        textDirection: TextDirection.ltr,
+        child: MeditrackApp(),
+      ),
     ),
   );
 }
