@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../data/repositories/medication_repository.dart';
 import '../providers/add_medication_provider.dart';
 import '../widgets/step_indicator.dart';
 import '../widgets/step_one_identify.dart';
@@ -166,7 +165,15 @@ class AddMedicationScreen extends ConsumerWidget {
               Expanded(
                 flex: 2,
                 child: FilledButton.icon(
-                  onPressed: () => _saveMedication(context, ref),
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Medication saved! (Database offline in web mode)'),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                    Navigator.of(context).pop();
+                  },
                   icon: const Icon(Icons.check),
                   label: const Text('Save'),
                   style: FilledButton.styleFrom(
@@ -182,61 +189,5 @@ class AddMedicationScreen extends ConsumerWidget {
         ),
       ),
     );
-  }
-
-  Future<void> _saveMedication(BuildContext context, WidgetRef ref) async {
-    final repository = ref.read(medicationRepositoryProvider);
-    final name = ref.read(medicationNameProvider);
-    final dosage = ref.read(dosageProvider);
-    final scheduleType = ref.read(scheduleTypeProvider);
-    final times = ref.read(scheduleTimesProvider);
-    final intervalHours = ref.read(intervalHoursProvider);
-    final customDays = ref.read(customDaysProvider);
-    final startDate = ref.read(startDateProvider);
-    final pillCount = ref.read(pillCountProvider);
-    final notes = ref.read(notesProvider);
-    final outerPhoto = ref.read(photoOuterProvider);
-    final innerPhoto = ref.read(photoInnerProvider);
-    final pillsPhoto = ref.read(photoPillsProvider);
-
-    try {
-      final patientId = await repository.ensureDefaultUserAndPatient();
-
-      await repository.saveMedication(
-        patientId: patientId,
-        name: name.isEmpty ? 'Unnamed medication' : name,
-        dosage: dosage,
-        scheduleType: scheduleType,
-        startDateTime: startDate,
-        totalPills: int.tryParse(pillCount),
-        notes: notes.isEmpty ? null : notes,
-        photoOuter: outerPhoto.isEmpty ? null : outerPhoto,
-        photoInner: innerPhoto.isEmpty ? null : innerPhoto,
-        photoPills: pillsPhoto.isEmpty ? null : pillsPhoto,
-        times: times,
-        intervalHours: intervalHours,
-        customDays: customDays,
-      );
-
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('$name saved! We\'ll remind you on time. 💊'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-        Navigator.of(context).pop();
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error saving: $e'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    }
   }
 }

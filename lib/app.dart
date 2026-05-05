@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'features/dashboard/screens/dashboard_screen.dart';
+import 'features/shell/main_shell.dart';
 
 class MeditrackApp extends ConsumerWidget {
   const MeditrackApp({super.key});
@@ -32,7 +32,7 @@ class MeditrackApp extends ConsumerWidget {
         ),
         useMaterial3: true,
       ),
-      home: const DashboardScreen(),
+      home: const MainShell(),
     );
   }
 }
