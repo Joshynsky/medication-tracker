@@ -27,6 +27,7 @@ class MockDoseEvent {
   final int medicationId;
   final DateTime scheduledTime;
   String status; // 'pending', 'taken', 'missed'
+  int snoozeCount = 0;
 
   MockDoseEvent({
     required this.id,
@@ -136,11 +137,16 @@ class MockMedicationRepository {
     } catch (_) {}
   }
 
-  void skipDose(int doseId) {
+  void snoozeDose(int doseId) {
     try {
       final dose = _doseEvents.firstWhere((d) => d.id == doseId);
-      dose.status = 'skipped';
+      dose.snoozeCount++;
     } catch (_) {}
+  }
+
+  void deleteMedication(int medId) {
+    _medications.removeWhere((m) => m.id == medId);
+    _doseEvents.removeWhere((d) => d.medicationId == medId);
   }
 
   int addMedication({

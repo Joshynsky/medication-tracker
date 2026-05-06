@@ -11,136 +11,102 @@ class StepThreeQuantity extends ConsumerStatefulWidget {
 
 class _StepThreeQuantityState extends ConsumerState<StepThreeQuantity> {
   bool _showHelperText = false;
+  final _pillController = TextEditingController();
+  final _notesController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    // Show helper text after 4 seconds of inactivity
+    final pillCount = ref.read(pillCountProvider);
+    final notes = ref.read(notesProvider);
+    _pillController.text = pillCount;
+    _notesController.text = notes;
     Future.delayed(const Duration(seconds: 4), () {
-      if (mounted) {
-        setState(() {
-          _showHelperText = true;
-        });
-      }
+      if (mounted) setState(() => _showHelperText = true);
     });
+  }
+
+  @override
+  void dispose() {
+    _pillController.dispose();
+    _notesController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final pillCount = ref.watch(pillCountProvider);
-    final notes = ref.watch(notesProvider);
     final theme = Theme.of(context);
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header
-          Text(
-            'How much do you have?',
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Optional — skip if you\'re unsure.',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 32),
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('How much do you have?', style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Text('Optional — skip if you\'re unsure.', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+            const SizedBox(height: 32),
 
-          // Pill count
-          Text(
-            'Number of pills',
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 8),
-          TextField(
-            controller: TextEditingController(text: pillCount),
-            keyboardType: TextInputType.number,
-            decoration: InputDecoration(
-              hintText: 'e.g., 21, 30, 60',
-              border: const OutlineInputBorder(),
-              prefixIcon: const Icon(Icons.medication_outlined),
-              suffixText: 'pills',
-            ),
-            onChanged: (value) {
-              ref.read(pillCountProvider.notifier).state = value;
-            },
-          ),
-
-          // Delayed helper text
-          AnimatedOpacity(
-            opacity: _showHelperText && pillCount.isEmpty ? 1.0 : 0.0,
-            duration: const Duration(milliseconds: 500),
-            child: Padding(
-              padding: const EdgeInsets.only(top: 12),
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primaryContainer.withOpacity(0.3),
-                  borderRadius: BorderRadius.circular(8),
+            Text('Number of pills', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            Directionality(
+              textDirection: TextDirection.ltr,
+              child: TextField(
+                textDirection: TextDirection.ltr,
+                controller: _pillController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  hintText: 'e.g., 21, 30, 60',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.medication_outlined),
+                  suffixText: 'pills',
                 ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.lightbulb_outline,
-                      size: 20,
-                      color: theme.colorScheme.primary,
-                    ),
+                onChanged: (value) => ref.read(pillCountProvider.notifier).state = value,
+              ),
+            ),
+
+            AnimatedOpacity(
+              opacity: _showHelperText && pillCount.isEmpty ? 1.0 : 0.0,
+              duration: const Duration(milliseconds: 500),
+              child: Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(color: theme.colorScheme.primaryContainer.withOpacity(0.3), borderRadius: BorderRadius.circular(8)),
+                  child: Row(children: [
+                    Icon(Icons.lightbulb_outline, size: 20, color: theme.colorScheme.primary),
                     const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'We\'ll count down so you know when to refill.',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                  ],
+                    Expanded(child: Text('We\'ll count down so you know when to refill.', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant))),
+                  ]),
                 ),
               ),
             ),
-          ),
-          const SizedBox(height: 32),
+            const SizedBox(height: 32),
 
-          // Notes
-          Text(
-            'Notes',
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Any special instructions?',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 8),
-          TextField(
-            controller: TextEditingController(text: notes),
-            maxLines: 3,
-            decoration: const InputDecoration(
-              hintText: 'e.g., Take with food, avoid alcohol...',
-              border: OutlineInputBorder(),
-              prefixIcon: Padding(
-                padding: EdgeInsets.only(bottom: 48),
-                child: Icon(Icons.note_alt_outlined),
+            Text('Notes', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            Text('Any special instructions?', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+            const SizedBox(height: 8),
+            Directionality(
+              textDirection: TextDirection.ltr,
+              child: TextField(
+                textDirection: TextDirection.ltr,
+                controller: _notesController,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  hintText: 'e.g., Take with food, avoid alcohol...',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Padding(padding: EdgeInsets.only(bottom: 48), child: Icon(Icons.note_alt_outlined)),
+                ),
+                onChanged: (value) => ref.read(notesProvider.notifier).state = value,
               ),
             ),
-            onChanged: (value) {
-              ref.read(notesProvider.notifier).state = value;
-            },
-          ),
-          const SizedBox(height: 32),
-        ],
+            const SizedBox(height: 32),
+          ],
+        ),
       ),
     );
   }

@@ -9,95 +9,99 @@ class HistoryScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final historyState = ref.watch(historyProvider);
+    final historyAsync = ref.watch(historyProvider);
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('History'),
-        centerTitle: true,
-      ),
-      body: SafeArea(
-        child: CustomScrollView(
-          slivers: [
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        _StatCard(
-                          icon: Icons.trending_up,
-                          label: 'This Week',
-                          value: '${historyState.weeklyAdherence.toStringAsFixed(0)}%',
-                          color: historyState.weeklyAdherence >= 80
-                              ? Colors.green
-                              : Colors.orange,
-                        ),
-                        const SizedBox(width: 12),
-                        _StatCard(
-                          icon: Icons.local_fire_department,
-                          label: 'Streak',
-                          value: '${historyState.currentStreak} days',
-                          color: historyState.currentStreak >= 3
-                              ? Colors.orange
-                              : theme.colorScheme.onSurface,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-                    AdherenceCalendar(weekDays: historyState.weekDays),
-                  ],
-                ),
-              ),
-            ),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                child: Text(
-                  'Active Medications',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
+      appBar: AppBar(title: const Text('History'), centerTitle: true),
+      body: historyAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(child: Text('Error: $e')),
+        data: (historyState) => SafeArea(
+          child: CustomScrollView(
+            slivers: [
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          _StatCard(
+                            icon: Icons.trending_up,
+                            label: 'This Week',
+                            value:
+                                '${historyState.weeklyAdherence.toStringAsFixed(0)}%',
+                            color: historyState.weeklyAdherence >= 80
+                                ? Colors.green
+                                : Colors.orange,
+                          ),
+                          const SizedBox(width: 12),
+                          _StatCard(
+                            icon: Icons.local_fire_department,
+                            label: 'Streak',
+                            value: '${historyState.currentStreak} days',
+                            color: historyState.currentStreak >= 3
+                                ? Colors.orange
+                                : theme.colorScheme.onSurface,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+                      AdherenceCalendar(weekDays: historyState.weekDays),
+                    ],
                   ),
                 ),
               ),
-            ),
-            SliverList(
-              delegate: SliverChildBuilderDelegate(
-                (context, index) {
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 8,
+                  ),
+                  child: Text(
+                    'Active Medications',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+              SliverList(
+                delegate: SliverChildBuilderDelegate((context, index) {
                   final active = historyState.pastMedications
                       .where((m) => m.isActive)
                       .toList();
                   if (index >= active.length) return null;
                   return PastMedicationCard(medication: active[index]);
-                },
+                }),
               ),
-            ),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                child: Text(
-                  'Completed',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 16,
+                  ),
+                  child: Text(
+                    'Completed',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ),
-            ),
-            SliverList(
-              delegate: SliverChildBuilderDelegate(
-                (context, index) {
+              SliverList(
+                delegate: SliverChildBuilderDelegate((context, index) {
                   final completed = historyState.pastMedications
                       .where((m) => !m.isActive)
                       .toList();
                   if (index >= completed.length) return null;
                   return PastMedicationCard(medication: completed[index]);
-                },
+                }),
               ),
-            ),
-            const SliverToBoxAdapter(child: SizedBox(height: 24)),
-          ],
+              const SliverToBoxAdapter(child: SizedBox(height: 24)),
+            ],
+          ),
         ),
       ),
     );
@@ -109,7 +113,6 @@ class _StatCard extends StatelessWidget {
   final String label;
   final String value;
   final Color color;
-
   const _StatCard({
     required this.icon,
     required this.label,
@@ -120,7 +123,6 @@ class _StatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
     return Expanded(
       child: Container(
         padding: const EdgeInsets.all(16),

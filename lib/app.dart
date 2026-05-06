@@ -10,14 +10,6 @@ class MeditrackApp extends ConsumerWidget {
     return MaterialApp(
       title: 'MediTrack',
       debugShowCheckedModeBanner: false,
-      localizationsDelegates: const [
-        DefaultMaterialLocalizations.delegate,
-        DefaultWidgetsLocalizations.delegate,
-      ],
-      supportedLocales: const [
-        Locale('en', 'US'),
-      ],
-      locale: const Locale('en', 'US'),
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFF2196F3),

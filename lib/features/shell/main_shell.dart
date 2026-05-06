@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../features/timeline/screens/timeline_screen.dart';
 import '../../features/dashboard/screens/dashboard_screen.dart';
 import '../../features/history/screens/history_screen.dart';
 import '../../features/more/screens/more_screen.dart';
 
-final selectedTabProvider = StateProvider<int>((ref) => 0);
+final selectedTabProvider = StateProvider<int>((ref) => 1); // Default to Home
 
 class MainShell extends ConsumerWidget {
   const MainShell({super.key});
@@ -12,18 +13,16 @@ class MainShell extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final selectedTab = ref.watch(selectedTabProvider);
-    final theme = Theme.of(context);
-
-    final screens = const [
-      DashboardScreen(),
-      HistoryScreen(),
-      MoreScreen(),
-    ];
 
     return Scaffold(
       body: IndexedStack(
         index: selectedTab,
-        children: screens,
+        children: const [
+          TimelineScreen(),
+          DashboardScreen(),
+          HistoryScreen(),
+          MoreScreen(),
+        ],
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: selectedTab,
@@ -31,6 +30,11 @@ class MainShell extends ConsumerWidget {
           ref.read(selectedTabProvider.notifier).state = index;
         },
         destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.access_time_outlined),
+            selectedIcon: Icon(Icons.access_time),
+            label: 'Timeline',
+          ),
           NavigationDestination(
             icon: Icon(Icons.home_outlined),
             selectedIcon: Icon(Icons.home),

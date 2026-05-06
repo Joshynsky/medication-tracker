@@ -1,356 +1,504 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../data/repositories/mock_medication_repository.dart';
-import '../../../shared/widgets/celebration_overlay.dart';
+import '../../../data/repositories/medication_repository.dart';
+import '../../../data/local/database.dart';
 import '../../add_medication/screens/add_medication_screen.dart';
+import '../../medication_detail/screens/detail_screen.dart';
+
+final dashboardRefreshProvider = StateProvider<int>((ref) => 0);
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
-
   @override
   ConsumerState<DashboardScreen> createState() => _DashboardScreenState();
 }
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
-  bool _showCelebration = false;
-  String _celebrationMessage = '';
+  String _greeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good morning! ☀️';
+    if (hour < 17) return 'Good afternoon! 🌤️';
+    return 'Good evening! 🌙';
+  }
 
-  void _confirmDose(MockMedicationRepository repo, int doseId) {
-    repo.confirmDose(doseId);
-    setState(() {
-      _celebrationMessage = 'Great job! Keep going! 💊';
-      _showCelebration = true;
-    });
+  @override
+  void initState() {
+    super.initState();
+    ref.read(dashboardRefreshProvider);
+  }
+
+  Future<Map<String, dynamic>> _loadData() async {
+    final repository = ref.read(medicationRepositoryProvider);
+    final patientId = await repository.ensureDefaultUserAndPatient();
+    final medications = await repository.getMedications(patientId);
+    final todaysDoses = await repository.getTodaysDoses(patientId);
+    return {'medications': medications, 'todaysDoses': todaysDoses};
+  }
+
+  void _refresh() {
+    ref.read(dashboardRefreshProvider.notifier).state++;
+    setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
-    final repository = ref.watch(mockRepositoryProvider);
-    final medications = repository.getMedications();
-    final todaysDoses = repository.getTodaysDoses();
     final theme = Theme.of(context);
+    ref.watch(dashboardRefreshProvider);
 
-    final takenCount = todaysDoses.where((d) => d.status == 'taken').length;
-    final pendingCount = todaysDoses.where((d) => d.status == 'pending').length;
-    final missedCount = todaysDoses.where((d) => d.status == 'missed').length;
+    return Scaffold(
+      appBar: AppBar(title: const Text('MediTrack'), centerTitle: true),
+      body: FutureBuilder<Map<String, dynamic>>(
+        future: _loadData(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError || !snapshot.hasData) {
+            return Center(
+              child: Text(
+                'Error loading data',
+                style: TextStyle(color: theme.colorScheme.error),
+              ),
+            );
+          }
 
-    return Stack(
-      children: [
-        Scaffold(
-          appBar: AppBar(
-            title: const Text('MediTrack'),
-            centerTitle: true,
-          ),
-          body: SafeArea(
-            child: CustomScrollView(
-              slivers: [
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
+          final data = snapshot.data!;
+          final medications = data['medications'] as List<Medication>;
+          final todaysDoses = data['todaysDoses'] as List<DoseEvent>;
+          final takenCount = todaysDoses
+              .where((d) => d.status == 'taken')
+              .length;
+          final totalCount = todaysDoses.length;
+          final remainingCount = totalCount - takenCount;
+
+          todaysDoses.sort(
+            (a, b) => a.scheduledTime.compareTo(b.scheduledTime),
+          );
+          DoseEvent? nextDose;
+          try {
+            nextDose = todaysDoses.firstWhere((d) => d.status == 'pending');
+          } catch (_) {
+            nextDose = null;
+          }
+
+          List<Medication> nextDoseMeds = [];
+          if (nextDose != null) {
+            for (final dose in todaysDoses.where(
+              (d) =>
+                  d.scheduledTime.hour == nextDose!.scheduledTime.hour &&
+                  d.scheduledTime.minute == nextDose.scheduledTime.minute,
+            )) {
+              try {
+                nextDoseMeds.add(
+                  medications.firstWhere((m) => m.id == dose.medicationId),
+                );
+              } catch (_) {}
+            }
+          }
+
+          final timeSlots = <String, String>{};
+          for (final dose in todaysDoses) {
+            final key =
+                '${dose.scheduledTime.hour.toString().padLeft(2, '0')}:${dose.scheduledTime.minute.toString().padLeft(2, '0')}';
+            if (dose.status == 'taken') {
+              timeSlots[key] = 'taken';
+            } else if (timeSlots[key] != 'taken') {
+              timeSlots[key] = dose.status;
+            }
+          }
+          final sortedSlots = timeSlots.keys.toList()..sort();
+
+          return SafeArea(
+            child: ListView(
+              padding: const EdgeInsets.all(24),
+              children: [
+                Text(
+                  _greeting(),
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                if (nextDose != null && nextDoseMeds.isNotEmpty) ...[
+                  _NextDoseCard(
+                    timeStr:
+                        '${nextDose!.scheduledTime.hour.toString().padLeft(2, '0')}:${nextDose.scheduledTime.minute.toString().padLeft(2, '0')}',
+                    timeDiff: nextDose.scheduledTime.difference(DateTime.now()),
+                    medications: nextDoseMeds,
+                    onConfirm: () async {
+                      final repo = ref.read(medicationRepositoryProvider);
+                      for (final dose in todaysDoses.where(
+                        (d) =>
+                            d.scheduledTime.hour ==
+                                nextDose!.scheduledTime.hour &&
+                            d.scheduledTime.minute ==
+                                nextDose!.scheduledTime.minute,
+                      )) {
+                        await repo.confirmDose(dose.id, dose.medicationId);
+                      }
+                      _refresh();
+                    },
+                    onSnooze: () async {
+                      final repo = ref.read(medicationRepositoryProvider);
+                      for (final dose in todaysDoses.where(
+                        (d) =>
+                            d.scheduledTime.hour ==
+                                nextDose!.scheduledTime.hour &&
+                            d.scheduledTime.minute ==
+                                nextDose!.scheduledTime.minute,
+                      )) {
+                        await repo.snoozeDose(dose.id);
+                      }
+                      _refresh();
+                    },
+                  ),
+                  const SizedBox(height: 24),
+                ],
+                if (totalCount > 0) ...[
+                  Text(
+                    'Today\'s progress',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surfaceContainerLow,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                theme.colorScheme.primary,
-                                theme.colorScheme.primary.withOpacity(0.8),
-                              ],
-                            ),
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      '$takenCount of ${todaysDoses.length} taken',
-                                      style: theme.textTheme.titleLarge?.copyWith(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      missedCount > 0
-                                          ? '$missedCount missed'
-                                          : pendingCount > 0
-                                              ? '$pendingCount remaining'
-                                              : 'All done! 🎉',
-                                      style: theme.textTheme.bodyMedium?.copyWith(
-                                        color: Colors.white.withOpacity(0.9),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              Stack(
-                                alignment: Alignment.center,
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  SizedBox(
-                                    width: 48,
-                                    height: 48,
-                                    child: CircularProgressIndicator(
-                                      value: todaysDoses.isEmpty
-                                          ? 0
-                                          : takenCount / todaysDoses.length,
-                                      backgroundColor: Colors.white.withOpacity(0.3),
-                                      valueColor:
-                                          const AlwaysStoppedAnimation<Color>(Colors.white),
-                                      strokeWidth: 4,
+                                  Text(
+                                    '$takenCount of $totalCount taken',
+                                    style: theme.textTheme.titleSmall?.copyWith(
+                                      fontWeight: FontWeight.w600,
                                     ),
                                   ),
+                                  const SizedBox(height: 4),
                                   Text(
-                                    todaysDoses.isEmpty
-                                        ? '0%'
-                                        : '${((takenCount / todaysDoses.length) * 100).round()}%',
-                                    style: theme.textTheme.labelSmall?.copyWith(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
+                                    remainingCount > 0
+                                        ? '$remainingCount remaining 🌟'
+                                        : 'All done! 🎉',
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: theme.colorScheme.onSurfaceVariant,
                                     ),
                                   ),
                                 ],
                               ),
-                            ],
+                            ),
+                            Text(
+                              totalCount > 0
+                                  ? '${((takenCount / totalCount) * 100).round()}%'
+                                  : '0%',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: theme.colorScheme.primary,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            value: totalCount > 0 ? takenCount / totalCount : 0,
+                            minHeight: 8,
+                            backgroundColor:
+                                theme.colorScheme.surfaceContainerHighest,
                           ),
                         ),
                       ],
                     ),
                   ),
-                ),
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: Text(
-                      'Your Medications',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
+                  const SizedBox(height: 12),
+                  if (sortedSlots.isNotEmpty)
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: sortedSlots.map((time) {
+                          final status = timeSlots[time];
+                          IconData icon;
+                          Color color;
+                          if (status == 'taken') {
+                            icon = Icons.check_circle;
+                            color = Colors.green;
+                          } else if (status == 'missed') {
+                            icon = Icons.cancel;
+                            color = Colors.red;
+                          } else if (status == 'pending') {
+                            icon = Icons.access_time;
+                            color = theme.colorScheme.primary;
+                          } else {
+                            icon = Icons.circle_outlined;
+                            color = Colors.grey;
+                          }
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 16),
+                            child: Row(
+                              children: [
+                                Icon(icon, size: 16, color: color),
+                                const SizedBox(width: 4),
+                                Text(time, style: theme.textTheme.labelSmall),
+                              ],
+                            ),
+                          );
+                        }).toList(),
                       ),
                     ),
+                  const SizedBox(height: 24),
+                ],
+                if (medications.isNotEmpty) ...[
+                  Text(
+                    'Your medications',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-                SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) {
-                      final med = medications[index];
-                      final medDoses =
-                          todaysDoses.where((d) => d.medicationId == med.id).toList();
-                      return _MedicationCard(
-                        medication: med,
-                        doses: medDoses,
-                        onConfirm: (doseId) => _confirmDose(repository, doseId),
-                        onSkip: (doseId) {
-                          repository.skipDose(doseId);
-                          setState(() {});
-                        },
-                      );
-                    },
-                    childCount: medications.length,
-                  ),
-                ),
-                const SliverToBoxAdapter(
-                  child: SizedBox(height: 80),
-                ),
-              ],
-            ),
-          ),
-          floatingActionButton: FloatingActionButton.extended(
-            onPressed: () async {
-              await Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const AddMedicationScreen(),
-                ),
-              );
-            },
-            icon: const Icon(Icons.add),
-            label: const Text('Add Medication'),
-          ),
-        ),
-        // Celebration overlay
-        if (_showCelebration)
-          CelebrationOverlay(
-            message: _celebrationMessage,
-            onComplete: () {
-              setState(() {
-                _showCelebration = false;
-              });
-            },
-          ),
-      ],
-    );
-  }
-}
-
-class _MedicationCard extends StatelessWidget {
-  final MockMedication medication;
-  final List<MockDoseEvent> doses;
-  final Function(int) onConfirm;
-  final Function(int) onSkip;
-
-  const _MedicationCard({
-    required this.medication,
-    required this.doses,
-    required this.onConfirm,
-    required this.onSkip,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primaryContainer,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    Icons.medication,
-                    color: theme.colorScheme.primary,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        medication.name,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
+                  const SizedBox(height: 12),
+                  ...medications.map(
+                    (med) => Card(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      child: InkWell(
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                MedicationDetailScreen(medication: med),
+                          ),
+                        ).then((_) => _refresh()),
+                        borderRadius: BorderRadius.circular(12),
+                        child: Padding(
+                          padding: const EdgeInsets.all(14),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  color: theme.colorScheme.primaryContainer,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Icon(
+                                  Icons.medication,
+                                  color: theme.colorScheme.primary,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      med.name,
+                                      style: theme.textTheme.titleSmall
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                    ),
+                                    Text(
+                                      med.dosage,
+                                      style: theme.textTheme.bodySmall
+                                          ?.copyWith(
+                                            color: theme
+                                                .colorScheme
+                                                .onSurfaceVariant,
+                                          ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (med.totalPills > 0)
+                                Text(
+                                  '${med.pillsRemaining} left',
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              const SizedBox(width: 8),
+                              Icon(
+                                Icons.chevron_right,
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                      Text(
-                        medication.dosage,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
+                    ),
+                  ),
+                ],
+                if (medications.isEmpty)
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(48),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.medication_outlined,
+                            size: 48,
+                            color: theme.colorScheme.primary,
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'No medications yet',
+                            style: theme.textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Tap + to add your first medication',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                ),
-                if (medication.totalPills > 0)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      '${medication.pillsRemaining} left',
-                      style: theme.textTheme.labelSmall,
                     ),
                   ),
+                const SizedBox(height: 80),
               ],
             ),
-            if (doses.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              const Divider(),
-              const SizedBox(height: 8),
-              ...doses.map((dose) => _DoseRow(
-                    dose: dose,
-                    onConfirm: () => onConfirm(dose.id),
-                    onSkip: () => onSkip(dose.id),
-                  )),
-            ],
-          ],
-        ),
+          );
+        },
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const AddMedicationScreen()),
+          ).then((_) => _refresh());
+        },
+        icon: const Icon(Icons.add),
+        label: const Text('Add Medication'),
       ),
     );
   }
 }
 
-class _DoseRow extends StatelessWidget {
-  final MockDoseEvent dose;
+class _NextDoseCard extends StatelessWidget {
+  final String timeStr;
+  final Duration timeDiff;
+  final List<Medication> medications;
   final VoidCallback onConfirm;
-  final VoidCallback onSkip;
-
-  const _DoseRow({
-    required this.dose,
+  final VoidCallback onSnooze;
+  const _NextDoseCard({
+    required this.timeStr,
+    required this.timeDiff,
+    required this.medications,
     required this.onConfirm,
-    required this.onSkip,
+    required this.onSnooze,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final timeStr =
-        '${dose.scheduledTime.hour.toString().padLeft(2, '0')}:${dose.scheduledTime.minute.toString().padLeft(2, '0')}';
-
-    IconData icon;
-    Color iconColor;
-    String label;
-
-    switch (dose.status) {
-      case 'taken':
-        icon = Icons.check_circle;
-        iconColor = Colors.green;
-        label = 'Taken at $timeStr ✓';
-        break;
-      case 'missed':
-        icon = Icons.cancel;
-        iconColor = Colors.red;
-        label = 'Missed at $timeStr ✗';
-        break;
-      case 'skipped':
-        icon = Icons.skip_next;
-        iconColor = Colors.orange;
-        label = 'Skipped at $timeStr';
-        break;
-      default:
-        icon = Icons.access_time;
-        iconColor = theme.colorScheme.primary;
-        label = 'Due at $timeStr';
-    }
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            theme.colorScheme.primary,
+            theme.colorScheme.primary.withOpacity(0.7),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
         children: [
-          Icon(icon, size: 18, color: iconColor),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              label,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: dose.status == 'pending'
-                    ? theme.colorScheme.onSurface
-                    : theme.colorScheme.onSurfaceVariant,
+          Text(
+            'Up next',
+            style: theme.textTheme.labelLarge?.copyWith(color: Colors.white70),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            timeStr,
+            style: theme.textTheme.displaySmall?.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          if (timeDiff.inMinutes > 0 && timeDiff.inHours < 12)
+            Text(
+              'in ${timeDiff.inHours > 0 ? '${timeDiff.inHours}h ' : ''}${timeDiff.inMinutes.remainder(60)}m',
+              style: theme.textTheme.bodyLarge?.copyWith(color: Colors.white70),
+            ),
+          const SizedBox(height: 20),
+          ...medications.map(
+            (med) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.medication, color: Colors.white, size: 20),
+                    const SizedBox(width: 10),
+                    Text(
+                      med.name,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      med.dosage,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: Colors.white70,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
-          if (dose.status == 'pending') ...[
-            TextButton(
-              onPressed: onSkip,
-              child: const Text('Skip'),
-            ),
-            const SizedBox(width: 4),
-            FilledButton(
-              onPressed: onConfirm,
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                minimumSize: Size.zero,
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: onSnooze,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    side: const BorderSide(color: Colors.white30),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text('Snooze'),
+                ),
               ),
-              child: const Text('Take'),
-            ),
-          ],
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 2,
+                child: FilledButton(
+                  onPressed: onConfirm,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: theme.colorScheme.primary,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text(
+                    'I took them',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );

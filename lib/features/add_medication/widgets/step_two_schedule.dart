@@ -40,7 +40,7 @@ class _StepTwoScheduleState extends ConsumerState<StepTwoSchedule> {
     final startDate = ref.watch(startDateProvider);
     final theme = Theme.of(context);
 
-    return SingleChildScrollView(
+    return Directionality(textDirection: TextDirection.ltr, child: SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -70,7 +70,7 @@ class _StepTwoScheduleState extends ConsumerState<StepTwoSchedule> {
           ),
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
-            value: scheduleType,
+            initialValue: scheduleType,
             decoration: const InputDecoration(
               border: OutlineInputBorder(),
               prefixIcon: Icon(Icons.schedule_outlined),
@@ -161,7 +161,7 @@ class _StepTwoScheduleState extends ConsumerState<StepTwoSchedule> {
           const SizedBox(height: 32),
         ],
       ),
-    );
+      ));
   }
 
   Widget _buildScheduleFields(
@@ -206,7 +206,8 @@ class _StepTwoScheduleState extends ConsumerState<StepTwoSchedule> {
                         (hour, minute) {
                           final newTimes = List<Map<String, int>>.from(times);
                           newTimes[index] = {'hour': hour, 'minute': minute};
-                          ref.read(scheduleTimesProvider.notifier).state = newTimes;
+                          ref.read(scheduleTimesProvider.notifier).state =
+                              newTimes;
                         },
                       ),
                     ),
@@ -220,7 +221,8 @@ class _StepTwoScheduleState extends ConsumerState<StepTwoSchedule> {
                         onPressed: () {
                           final newTimes = List<Map<String, int>>.from(times);
                           newTimes.removeAt(index);
-                          ref.read(scheduleTimesProvider.notifier).state = newTimes;
+                          ref.read(scheduleTimesProvider.notifier).state =
+                              newTimes;
                         },
                       ),
                     ],
@@ -302,7 +304,9 @@ class _StepTwoScheduleState extends ConsumerState<StepTwoSchedule> {
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
-              children: ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'].map((day) {
+              children: ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'].map((
+                day,
+              ) {
                 final selected = ref.watch(customDaysProvider).contains(day);
                 return FilterChip(
                   label: Text(day),
@@ -365,10 +369,7 @@ class _StepTwoScheduleState extends ConsumerState<StepTwoSchedule> {
         ),
         child: Row(
           children: [
-            Icon(
-              Icons.access_time,
-              color: theme.colorScheme.primary,
-            ),
+            Icon(Icons.access_time, color: theme.colorScheme.primary),
             const SizedBox(width: 12),
             Text(
               '$label: ${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}',
@@ -377,6 +378,6 @@ class _StepTwoScheduleState extends ConsumerState<StepTwoSchedule> {
           ],
         ),
       ),
-    );
+      );
   }
 }
