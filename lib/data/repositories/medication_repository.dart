@@ -20,15 +20,12 @@ class MedicationRepository {
       final patients = await _db.select(_db.patients).get();
       if (patients.isNotEmpty) return patients.first.id;
     }
-
     final userId = await _db.into(_db.users).insert(
       UsersCompanion.insert(name: 'My Medications', accountType: 'personal'),
     );
-
     final patientId = await _db.into(_db.patients).insert(
       PatientsCompanion.insert(name: 'Default', caregiverId: Value(userId)),
     );
-
     return patientId;
   }
 
@@ -36,6 +33,12 @@ class MedicationRepository {
     required int patientId,
     required String name,
     required String dosage,
+    String? form,
+    double? strengthValue,
+    String? strengthUnit,
+    double? amountPerDose,
+    String? amountUnit,
+    String? quantityUnit,
     required String scheduleType,
     required DateTime startDateTime,
     int? totalPills,
@@ -50,6 +53,12 @@ class MedicationRepository {
         patientId: patientId,
         name: name,
         dosage: dosage,
+        form: Value(form ?? 'pills'),
+        strengthValue: Value(strengthValue),
+        strengthUnit: Value(strengthUnit),
+        amountPerDose: Value(amountPerDose ?? 1),
+        amountUnit: Value(amountUnit ?? 'tablet'),
+        quantityUnit: Value(quantityUnit ?? 'tablets'),
         scheduleType: scheduleType,
         startDateTime: startDateTime,
         totalPills: totalPills ?? 0,
@@ -73,93 +82,64 @@ class MedicationRepository {
     }
 
     await _generateDoseEvents(
-      medicationId: medicationId,
-      scheduleType: scheduleType,
-      startDateTime: startDateTime,
-      times: times,
-      intervalHours: intervalHours,
-      customDays: customDays,
-      totalPills: totalPills,
+      medicationId: medicationId, scheduleType: scheduleType,
+      startDateTime: startDateTime, times: times,
+      intervalHours: intervalHours, customDays: customDays, totalPills: totalPills,
     );
 
-    // Schedule notification alarms
     final doseTimes = _getDoseTimes(scheduleType, startDateTime, times, intervalHours, customDays, totalPills);
     await AlarmService.scheduleMedicationAlarms(
-      medicationId: medicationId,
-      medicationName: name,
-      dosage: dosage,
-      doseTimes: doseTimes,
+        scheduleType: scheduleType,
+        intervalHours: intervalHours,
+      medicationId: medicationId, medicationName: name, dosage: dosage, doseTimes: doseTimes,
     );
 
     return medicationId;
   }
 
   Future<void> _generateDoseEvents({
-    required int medicationId,
-    required String scheduleType,
-    required DateTime startDateTime,
-    required List<Map<String, int>> times,
-    required int intervalHours,
-    required Set<String> customDays,
-    int? totalPills,
+    required int medicationId, required String scheduleType,
+    required DateTime startDateTime, required List<Map<String, int>> times,
+    required int intervalHours, required Set<String> customDays, int? totalPills,
   }) async {
     final doses = _getDoseTimes(scheduleType, startDateTime, times, intervalHours, customDays, totalPills);
-
     for (final doseTime in doses) {
       await _db.into(_db.doseEvents).insert(
-        DoseEventsCompanion.insert(
-          medicationId: medicationId,
-          scheduledTime: doseTime,
-          status: const Value('pending'),
-        ),
+        DoseEventsCompanion.insert(medicationId: medicationId, scheduledTime: doseTime, status: const Value('pending')),
       );
     }
   }
 
   List<DateTime> _getDoseTimes(String scheduleType, DateTime startDateTime, List<Map<String, int>> times, int intervalHours, Set<String> customDays, int? totalPills) {
     final List<DateTime> doseTimes = [];
-    final endDate = DateTime(startDateTime.year, startDateTime.month + 1, startDateTime.day);
-
+    final endDate = DateTime(startDateTime.year, startDateTime.month, startDateTime.day + 7);
     switch (scheduleType) {
       case 'once_daily':
-        for (var d = startDateTime; d.isBefore(endDate); d = d.add(const Duration(days: 1))) {
+        for (var d = startDateTime; d.isBefore(endDate); d = d.add(const Duration(days: 1)))
           doseTimes.add(DateTime(d.year, d.month, d.day, times[0]['hour']!, times[0]['minute']!));
-        }
         break;
       case 'multiple_times':
-        for (var d = startDateTime; d.isBefore(endDate); d = d.add(const Duration(days: 1))) {
-          for (final time in times) {
+        for (var d = startDateTime; d.isBefore(endDate); d = d.add(const Duration(days: 1)))
+          for (final time in times)
             doseTimes.add(DateTime(d.year, d.month, d.day, time['hour']!, time['minute']!));
-          }
-        }
         break;
       case 'every_x_hours':
-        for (var d = startDateTime; d.isBefore(endDate); d = d.add(Duration(hours: intervalHours))) {
+        for (var d = startDateTime; d.isBefore(endDate); d = d.add(Duration(hours: intervalHours)))
           doseTimes.add(d);
-        }
         break;
       case 'custom':
-        const dayMap = {
-          'MON': DateTime.monday, 'TUE': DateTime.tuesday, 'WED': DateTime.wednesday,
-          'THU': DateTime.thursday, 'FRI': DateTime.friday, 'SAT': DateTime.saturday, 'SUN': DateTime.sunday,
-        };
-        for (var d = startDateTime; d.isBefore(endDate); d = d.add(const Duration(days: 1))) {
-          if (customDays.any((day) => dayMap[day] == d.weekday)) {
+        const dayMap = {'MON': DateTime.monday, 'TUE': DateTime.tuesday, 'WED': DateTime.wednesday, 'THU': DateTime.thursday, 'FRI': DateTime.friday, 'SAT': DateTime.saturday, 'SUN': DateTime.sunday};
+        for (var d = startDateTime; d.isBefore(endDate); d = d.add(const Duration(days: 1)))
+          if (customDays.any((day) => dayMap[day] == d.weekday))
             doseTimes.add(DateTime(d.year, d.month, d.day, times[0]['hour']!, times[0]['minute']!));
-          }
-        }
         break;
     }
-
     final doses = totalPills != null && totalPills > 0 ? doseTimes.take(totalPills) : doseTimes;
-    final now = DateTime.now();
-    return doses.where((d) => d.isAfter(now)).toList();
+    return doses.where((d) => d.isAfter(DateTime.now())).toList();
   }
 
   Future<List<Medication>> getMedications(int patientId) {
-    final query = _db.select(_db.medications)
-      ..where((t) => t.patientId.equals(patientId))
-      ..where((t) => t.isActive.equals(true));
+    final query = _db.select(_db.medications)..where((t) => t.patientId.equals(patientId))..where((t) => t.isActive.equals(true));
     return query.get();
   }
 
@@ -167,46 +147,29 @@ class MedicationRepository {
     final now = DateTime.now();
     final todayStart = DateTime(now.year, now.month, now.day);
     final todayEnd = todayStart.add(const Duration(days: 1));
-
-    final query = _db.select(_db.doseEvents).join([
-      innerJoin(_db.medications, _db.medications.id.equalsExp(_db.doseEvents.medicationId)),
-    ])
+    final query = _db.select(_db.doseEvents).join([innerJoin(_db.medications, _db.medications.id.equalsExp(_db.doseEvents.medicationId))])
       ..where(_db.medications.patientId.equals(patientId))
       ..where(_db.doseEvents.scheduledTime.isBetweenValues(todayStart, todayEnd));
-
     final rows = await query.get();
     return rows.map((row) => row.readTable(_db.doseEvents)).toList();
   }
 
   Future<void> confirmDose(int doseId, int medicationId) async {
     final med = await (_db.select(_db.medications)..where((t) => t.id.equals(medicationId))).getSingle();
-
-    await (_db.update(_db.doseEvents)..where((t) => t.id.equals(doseId))).write(
-      DoseEventsCompanion(
-        status: const Value('taken'),
-        confirmedAt: Value(DateTime.now()),
-      ),
-    );
-
+    await (_db.update(_db.doseEvents)..where((t) => t.id.equals(doseId))).write(DoseEventsCompanion(status: const Value('taken'), confirmedAt: Value(DateTime.now())));
     if (med.pillsRemaining > 0) {
-      await (_db.update(_db.medications)..where((t) => t.id.equals(medicationId))).write(
-        MedicationsCompanion(pillsRemaining: Value(med.pillsRemaining - 1)),
-      );
+      await (_db.update(_db.medications)..where((t) => t.id.equals(medicationId))).write(MedicationsCompanion(pillsRemaining: Value(med.pillsRemaining - 1)));
     }
   }
 
   Future<void> snoozeDose(int doseId) async {}
-
   Future<void> deleteMedication(int medicationId) async {
     await AlarmService.cancelMedicationAlarms(medicationId);
-    await (_db.update(_db.medications)..where((t) => t.id.equals(medicationId))).write(
-      const MedicationsCompanion(isActive: Value(false)),
-    );
+    await (_db.update(_db.medications)..where((t) => t.id.equals(medicationId))).write(const MedicationsCompanion(isActive: Value(false)));
   }
 
   Future<List<DoseEvent>> getDoseHistory(int medicationId) async {
-    final query = _db.select(_db.doseEvents)
-      ..where((t) => t.medicationId.equals(medicationId));
+    final query = _db.select(_db.doseEvents)..where((t) => t.medicationId.equals(medicationId));
     return query.get();
   }
 }

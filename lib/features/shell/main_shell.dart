@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../features/timeline/screens/timeline_screen.dart';
 import '../../features/dashboard/screens/dashboard_screen.dart';
 import '../../features/history/screens/history_screen.dart';
 import '../../features/more/screens/more_screen.dart';
 
-final selectedTabProvider = StateProvider<int>((ref) => 1); // Default to Home
+final selectedTabProvider = StateProvider<int>((ref) => 0);
 
 class MainShell extends ConsumerWidget {
   const MainShell({super.key});
@@ -18,7 +17,6 @@ class MainShell extends ConsumerWidget {
       body: IndexedStack(
         index: selectedTab,
         children: const [
-          TimelineScreen(),
           DashboardScreen(),
           HistoryScreen(),
           MoreScreen(),
@@ -26,30 +24,11 @@ class MainShell extends ConsumerWidget {
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: selectedTab,
-        onDestinationSelected: (index) {
-          ref.read(selectedTabProvider.notifier).state = index;
-        },
+        onDestinationSelected: (index) => ref.read(selectedTabProvider.notifier).state = index,
         destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.access_time_outlined),
-            selectedIcon: Icon(Icons.access_time),
-            label: 'Timeline',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.bar_chart_outlined),
-            selectedIcon: Icon(Icons.bar_chart),
-            label: 'History',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.more_horiz_outlined),
-            selectedIcon: Icon(Icons.more_horiz),
-            label: 'More',
-          ),
+          NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Home'),
+          NavigationDestination(icon: Icon(Icons.bar_chart_outlined), selectedIcon: Icon(Icons.bar_chart), label: 'History'),
+          NavigationDestination(icon: Icon(Icons.more_horiz_outlined), selectedIcon: Icon(Icons.more_horiz), label: 'More'),
         ],
       ),
     );

@@ -871,6 +871,62 @@ class $MedicationsTable extends Medications
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _formMeta = const VerificationMeta('form');
+  @override
+  late final GeneratedColumn<String> form = GeneratedColumn<String>(
+    'form',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('pills'),
+  );
+  static const VerificationMeta _strengthValueMeta = const VerificationMeta(
+    'strengthValue',
+  );
+  @override
+  late final GeneratedColumn<double> strengthValue = GeneratedColumn<double>(
+    'strength_value',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _strengthUnitMeta = const VerificationMeta(
+    'strengthUnit',
+  );
+  @override
+  late final GeneratedColumn<String> strengthUnit = GeneratedColumn<String>(
+    'strength_unit',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _amountPerDoseMeta = const VerificationMeta(
+    'amountPerDose',
+  );
+  @override
+  late final GeneratedColumn<double> amountPerDose = GeneratedColumn<double>(
+    'amount_per_dose',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  static const VerificationMeta _amountUnitMeta = const VerificationMeta(
+    'amountUnit',
+  );
+  @override
+  late final GeneratedColumn<String> amountUnit = GeneratedColumn<String>(
+    'amount_unit',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('tablet'),
+  );
   static const VerificationMeta _photoPathMeta = const VerificationMeta(
     'photoPath',
   );
@@ -927,6 +983,18 @@ class $MedicationsTable extends Medications
     type: DriftSqlType.int,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _quantityUnitMeta = const VerificationMeta(
+    'quantityUnit',
+  );
+  @override
+  late final GeneratedColumn<String> quantityUnit = GeneratedColumn<String>(
+    'quantity_unit',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('tablets'),
+  );
   static const VerificationMeta _notesMeta = const VerificationMeta('notes');
   @override
   late final GeneratedColumn<String> notes = GeneratedColumn<String>(
@@ -969,11 +1037,17 @@ class $MedicationsTable extends Medications
     patientId,
     name,
     dosage,
+    form,
+    strengthValue,
+    strengthUnit,
+    amountPerDose,
+    amountUnit,
     photoPath,
     scheduleType,
     startDateTime,
     totalPills,
     pillsRemaining,
+    quantityUnit,
     notes,
     isActive,
     createdAt,
@@ -1016,6 +1090,45 @@ class $MedicationsTable extends Medications
       );
     } else if (isInserting) {
       context.missing(_dosageMeta);
+    }
+    if (data.containsKey('form')) {
+      context.handle(
+        _formMeta,
+        form.isAcceptableOrUnknown(data['form']!, _formMeta),
+      );
+    }
+    if (data.containsKey('strength_value')) {
+      context.handle(
+        _strengthValueMeta,
+        strengthValue.isAcceptableOrUnknown(
+          data['strength_value']!,
+          _strengthValueMeta,
+        ),
+      );
+    }
+    if (data.containsKey('strength_unit')) {
+      context.handle(
+        _strengthUnitMeta,
+        strengthUnit.isAcceptableOrUnknown(
+          data['strength_unit']!,
+          _strengthUnitMeta,
+        ),
+      );
+    }
+    if (data.containsKey('amount_per_dose')) {
+      context.handle(
+        _amountPerDoseMeta,
+        amountPerDose.isAcceptableOrUnknown(
+          data['amount_per_dose']!,
+          _amountPerDoseMeta,
+        ),
+      );
+    }
+    if (data.containsKey('amount_unit')) {
+      context.handle(
+        _amountUnitMeta,
+        amountUnit.isAcceptableOrUnknown(data['amount_unit']!, _amountUnitMeta),
+      );
     }
     if (data.containsKey('photo_path')) {
       context.handle(
@@ -1064,6 +1177,15 @@ class $MedicationsTable extends Medications
     } else if (isInserting) {
       context.missing(_pillsRemainingMeta);
     }
+    if (data.containsKey('quantity_unit')) {
+      context.handle(
+        _quantityUnitMeta,
+        quantityUnit.isAcceptableOrUnknown(
+          data['quantity_unit']!,
+          _quantityUnitMeta,
+        ),
+      );
+    }
     if (data.containsKey('notes')) {
       context.handle(
         _notesMeta,
@@ -1107,6 +1229,26 @@ class $MedicationsTable extends Medications
         DriftSqlType.string,
         data['${effectivePrefix}dosage'],
       )!,
+      form: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}form'],
+      )!,
+      strengthValue: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}strength_value'],
+      ),
+      strengthUnit: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}strength_unit'],
+      ),
+      amountPerDose: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}amount_per_dose'],
+      )!,
+      amountUnit: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}amount_unit'],
+      )!,
       photoPath: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}photo_path'],
@@ -1126,6 +1268,10 @@ class $MedicationsTable extends Medications
       pillsRemaining: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}pills_remaining'],
+      )!,
+      quantityUnit: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}quantity_unit'],
       )!,
       notes: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
@@ -1153,11 +1299,17 @@ class Medication extends DataClass implements Insertable<Medication> {
   final int patientId;
   final String name;
   final String dosage;
+  final String form;
+  final double? strengthValue;
+  final String? strengthUnit;
+  final double amountPerDose;
+  final String amountUnit;
   final String? photoPath;
   final String scheduleType;
   final DateTime startDateTime;
   final int totalPills;
   final int pillsRemaining;
+  final String quantityUnit;
   final String? notes;
   final bool isActive;
   final DateTime createdAt;
@@ -1166,11 +1318,17 @@ class Medication extends DataClass implements Insertable<Medication> {
     required this.patientId,
     required this.name,
     required this.dosage,
+    required this.form,
+    this.strengthValue,
+    this.strengthUnit,
+    required this.amountPerDose,
+    required this.amountUnit,
     this.photoPath,
     required this.scheduleType,
     required this.startDateTime,
     required this.totalPills,
     required this.pillsRemaining,
+    required this.quantityUnit,
     this.notes,
     required this.isActive,
     required this.createdAt,
@@ -1182,6 +1340,15 @@ class Medication extends DataClass implements Insertable<Medication> {
     map['patient_id'] = Variable<int>(patientId);
     map['name'] = Variable<String>(name);
     map['dosage'] = Variable<String>(dosage);
+    map['form'] = Variable<String>(form);
+    if (!nullToAbsent || strengthValue != null) {
+      map['strength_value'] = Variable<double>(strengthValue);
+    }
+    if (!nullToAbsent || strengthUnit != null) {
+      map['strength_unit'] = Variable<String>(strengthUnit);
+    }
+    map['amount_per_dose'] = Variable<double>(amountPerDose);
+    map['amount_unit'] = Variable<String>(amountUnit);
     if (!nullToAbsent || photoPath != null) {
       map['photo_path'] = Variable<String>(photoPath);
     }
@@ -1189,6 +1356,7 @@ class Medication extends DataClass implements Insertable<Medication> {
     map['start_date_time'] = Variable<DateTime>(startDateTime);
     map['total_pills'] = Variable<int>(totalPills);
     map['pills_remaining'] = Variable<int>(pillsRemaining);
+    map['quantity_unit'] = Variable<String>(quantityUnit);
     if (!nullToAbsent || notes != null) {
       map['notes'] = Variable<String>(notes);
     }
@@ -1203,6 +1371,15 @@ class Medication extends DataClass implements Insertable<Medication> {
       patientId: Value(patientId),
       name: Value(name),
       dosage: Value(dosage),
+      form: Value(form),
+      strengthValue: strengthValue == null && nullToAbsent
+          ? const Value.absent()
+          : Value(strengthValue),
+      strengthUnit: strengthUnit == null && nullToAbsent
+          ? const Value.absent()
+          : Value(strengthUnit),
+      amountPerDose: Value(amountPerDose),
+      amountUnit: Value(amountUnit),
       photoPath: photoPath == null && nullToAbsent
           ? const Value.absent()
           : Value(photoPath),
@@ -1210,6 +1387,7 @@ class Medication extends DataClass implements Insertable<Medication> {
       startDateTime: Value(startDateTime),
       totalPills: Value(totalPills),
       pillsRemaining: Value(pillsRemaining),
+      quantityUnit: Value(quantityUnit),
       notes: notes == null && nullToAbsent
           ? const Value.absent()
           : Value(notes),
@@ -1228,11 +1406,17 @@ class Medication extends DataClass implements Insertable<Medication> {
       patientId: serializer.fromJson<int>(json['patientId']),
       name: serializer.fromJson<String>(json['name']),
       dosage: serializer.fromJson<String>(json['dosage']),
+      form: serializer.fromJson<String>(json['form']),
+      strengthValue: serializer.fromJson<double?>(json['strengthValue']),
+      strengthUnit: serializer.fromJson<String?>(json['strengthUnit']),
+      amountPerDose: serializer.fromJson<double>(json['amountPerDose']),
+      amountUnit: serializer.fromJson<String>(json['amountUnit']),
       photoPath: serializer.fromJson<String?>(json['photoPath']),
       scheduleType: serializer.fromJson<String>(json['scheduleType']),
       startDateTime: serializer.fromJson<DateTime>(json['startDateTime']),
       totalPills: serializer.fromJson<int>(json['totalPills']),
       pillsRemaining: serializer.fromJson<int>(json['pillsRemaining']),
+      quantityUnit: serializer.fromJson<String>(json['quantityUnit']),
       notes: serializer.fromJson<String?>(json['notes']),
       isActive: serializer.fromJson<bool>(json['isActive']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
@@ -1246,11 +1430,17 @@ class Medication extends DataClass implements Insertable<Medication> {
       'patientId': serializer.toJson<int>(patientId),
       'name': serializer.toJson<String>(name),
       'dosage': serializer.toJson<String>(dosage),
+      'form': serializer.toJson<String>(form),
+      'strengthValue': serializer.toJson<double?>(strengthValue),
+      'strengthUnit': serializer.toJson<String?>(strengthUnit),
+      'amountPerDose': serializer.toJson<double>(amountPerDose),
+      'amountUnit': serializer.toJson<String>(amountUnit),
       'photoPath': serializer.toJson<String?>(photoPath),
       'scheduleType': serializer.toJson<String>(scheduleType),
       'startDateTime': serializer.toJson<DateTime>(startDateTime),
       'totalPills': serializer.toJson<int>(totalPills),
       'pillsRemaining': serializer.toJson<int>(pillsRemaining),
+      'quantityUnit': serializer.toJson<String>(quantityUnit),
       'notes': serializer.toJson<String?>(notes),
       'isActive': serializer.toJson<bool>(isActive),
       'createdAt': serializer.toJson<DateTime>(createdAt),
@@ -1262,11 +1452,17 @@ class Medication extends DataClass implements Insertable<Medication> {
     int? patientId,
     String? name,
     String? dosage,
+    String? form,
+    Value<double?> strengthValue = const Value.absent(),
+    Value<String?> strengthUnit = const Value.absent(),
+    double? amountPerDose,
+    String? amountUnit,
     Value<String?> photoPath = const Value.absent(),
     String? scheduleType,
     DateTime? startDateTime,
     int? totalPills,
     int? pillsRemaining,
+    String? quantityUnit,
     Value<String?> notes = const Value.absent(),
     bool? isActive,
     DateTime? createdAt,
@@ -1275,11 +1471,19 @@ class Medication extends DataClass implements Insertable<Medication> {
     patientId: patientId ?? this.patientId,
     name: name ?? this.name,
     dosage: dosage ?? this.dosage,
+    form: form ?? this.form,
+    strengthValue: strengthValue.present
+        ? strengthValue.value
+        : this.strengthValue,
+    strengthUnit: strengthUnit.present ? strengthUnit.value : this.strengthUnit,
+    amountPerDose: amountPerDose ?? this.amountPerDose,
+    amountUnit: amountUnit ?? this.amountUnit,
     photoPath: photoPath.present ? photoPath.value : this.photoPath,
     scheduleType: scheduleType ?? this.scheduleType,
     startDateTime: startDateTime ?? this.startDateTime,
     totalPills: totalPills ?? this.totalPills,
     pillsRemaining: pillsRemaining ?? this.pillsRemaining,
+    quantityUnit: quantityUnit ?? this.quantityUnit,
     notes: notes.present ? notes.value : this.notes,
     isActive: isActive ?? this.isActive,
     createdAt: createdAt ?? this.createdAt,
@@ -1290,6 +1494,19 @@ class Medication extends DataClass implements Insertable<Medication> {
       patientId: data.patientId.present ? data.patientId.value : this.patientId,
       name: data.name.present ? data.name.value : this.name,
       dosage: data.dosage.present ? data.dosage.value : this.dosage,
+      form: data.form.present ? data.form.value : this.form,
+      strengthValue: data.strengthValue.present
+          ? data.strengthValue.value
+          : this.strengthValue,
+      strengthUnit: data.strengthUnit.present
+          ? data.strengthUnit.value
+          : this.strengthUnit,
+      amountPerDose: data.amountPerDose.present
+          ? data.amountPerDose.value
+          : this.amountPerDose,
+      amountUnit: data.amountUnit.present
+          ? data.amountUnit.value
+          : this.amountUnit,
       photoPath: data.photoPath.present ? data.photoPath.value : this.photoPath,
       scheduleType: data.scheduleType.present
           ? data.scheduleType.value
@@ -1303,6 +1520,9 @@ class Medication extends DataClass implements Insertable<Medication> {
       pillsRemaining: data.pillsRemaining.present
           ? data.pillsRemaining.value
           : this.pillsRemaining,
+      quantityUnit: data.quantityUnit.present
+          ? data.quantityUnit.value
+          : this.quantityUnit,
       notes: data.notes.present ? data.notes.value : this.notes,
       isActive: data.isActive.present ? data.isActive.value : this.isActive,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
@@ -1316,11 +1536,17 @@ class Medication extends DataClass implements Insertable<Medication> {
           ..write('patientId: $patientId, ')
           ..write('name: $name, ')
           ..write('dosage: $dosage, ')
+          ..write('form: $form, ')
+          ..write('strengthValue: $strengthValue, ')
+          ..write('strengthUnit: $strengthUnit, ')
+          ..write('amountPerDose: $amountPerDose, ')
+          ..write('amountUnit: $amountUnit, ')
           ..write('photoPath: $photoPath, ')
           ..write('scheduleType: $scheduleType, ')
           ..write('startDateTime: $startDateTime, ')
           ..write('totalPills: $totalPills, ')
           ..write('pillsRemaining: $pillsRemaining, ')
+          ..write('quantityUnit: $quantityUnit, ')
           ..write('notes: $notes, ')
           ..write('isActive: $isActive, ')
           ..write('createdAt: $createdAt')
@@ -1334,11 +1560,17 @@ class Medication extends DataClass implements Insertable<Medication> {
     patientId,
     name,
     dosage,
+    form,
+    strengthValue,
+    strengthUnit,
+    amountPerDose,
+    amountUnit,
     photoPath,
     scheduleType,
     startDateTime,
     totalPills,
     pillsRemaining,
+    quantityUnit,
     notes,
     isActive,
     createdAt,
@@ -1351,11 +1583,17 @@ class Medication extends DataClass implements Insertable<Medication> {
           other.patientId == this.patientId &&
           other.name == this.name &&
           other.dosage == this.dosage &&
+          other.form == this.form &&
+          other.strengthValue == this.strengthValue &&
+          other.strengthUnit == this.strengthUnit &&
+          other.amountPerDose == this.amountPerDose &&
+          other.amountUnit == this.amountUnit &&
           other.photoPath == this.photoPath &&
           other.scheduleType == this.scheduleType &&
           other.startDateTime == this.startDateTime &&
           other.totalPills == this.totalPills &&
           other.pillsRemaining == this.pillsRemaining &&
+          other.quantityUnit == this.quantityUnit &&
           other.notes == this.notes &&
           other.isActive == this.isActive &&
           other.createdAt == this.createdAt);
@@ -1366,11 +1604,17 @@ class MedicationsCompanion extends UpdateCompanion<Medication> {
   final Value<int> patientId;
   final Value<String> name;
   final Value<String> dosage;
+  final Value<String> form;
+  final Value<double?> strengthValue;
+  final Value<String?> strengthUnit;
+  final Value<double> amountPerDose;
+  final Value<String> amountUnit;
   final Value<String?> photoPath;
   final Value<String> scheduleType;
   final Value<DateTime> startDateTime;
   final Value<int> totalPills;
   final Value<int> pillsRemaining;
+  final Value<String> quantityUnit;
   final Value<String?> notes;
   final Value<bool> isActive;
   final Value<DateTime> createdAt;
@@ -1379,11 +1623,17 @@ class MedicationsCompanion extends UpdateCompanion<Medication> {
     this.patientId = const Value.absent(),
     this.name = const Value.absent(),
     this.dosage = const Value.absent(),
+    this.form = const Value.absent(),
+    this.strengthValue = const Value.absent(),
+    this.strengthUnit = const Value.absent(),
+    this.amountPerDose = const Value.absent(),
+    this.amountUnit = const Value.absent(),
     this.photoPath = const Value.absent(),
     this.scheduleType = const Value.absent(),
     this.startDateTime = const Value.absent(),
     this.totalPills = const Value.absent(),
     this.pillsRemaining = const Value.absent(),
+    this.quantityUnit = const Value.absent(),
     this.notes = const Value.absent(),
     this.isActive = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -1393,11 +1643,17 @@ class MedicationsCompanion extends UpdateCompanion<Medication> {
     required int patientId,
     required String name,
     required String dosage,
+    this.form = const Value.absent(),
+    this.strengthValue = const Value.absent(),
+    this.strengthUnit = const Value.absent(),
+    this.amountPerDose = const Value.absent(),
+    this.amountUnit = const Value.absent(),
     this.photoPath = const Value.absent(),
     required String scheduleType,
     required DateTime startDateTime,
     required int totalPills,
     required int pillsRemaining,
+    this.quantityUnit = const Value.absent(),
     this.notes = const Value.absent(),
     this.isActive = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -1413,11 +1669,17 @@ class MedicationsCompanion extends UpdateCompanion<Medication> {
     Expression<int>? patientId,
     Expression<String>? name,
     Expression<String>? dosage,
+    Expression<String>? form,
+    Expression<double>? strengthValue,
+    Expression<String>? strengthUnit,
+    Expression<double>? amountPerDose,
+    Expression<String>? amountUnit,
     Expression<String>? photoPath,
     Expression<String>? scheduleType,
     Expression<DateTime>? startDateTime,
     Expression<int>? totalPills,
     Expression<int>? pillsRemaining,
+    Expression<String>? quantityUnit,
     Expression<String>? notes,
     Expression<bool>? isActive,
     Expression<DateTime>? createdAt,
@@ -1427,11 +1689,17 @@ class MedicationsCompanion extends UpdateCompanion<Medication> {
       if (patientId != null) 'patient_id': patientId,
       if (name != null) 'name': name,
       if (dosage != null) 'dosage': dosage,
+      if (form != null) 'form': form,
+      if (strengthValue != null) 'strength_value': strengthValue,
+      if (strengthUnit != null) 'strength_unit': strengthUnit,
+      if (amountPerDose != null) 'amount_per_dose': amountPerDose,
+      if (amountUnit != null) 'amount_unit': amountUnit,
       if (photoPath != null) 'photo_path': photoPath,
       if (scheduleType != null) 'schedule_type': scheduleType,
       if (startDateTime != null) 'start_date_time': startDateTime,
       if (totalPills != null) 'total_pills': totalPills,
       if (pillsRemaining != null) 'pills_remaining': pillsRemaining,
+      if (quantityUnit != null) 'quantity_unit': quantityUnit,
       if (notes != null) 'notes': notes,
       if (isActive != null) 'is_active': isActive,
       if (createdAt != null) 'created_at': createdAt,
@@ -1443,11 +1711,17 @@ class MedicationsCompanion extends UpdateCompanion<Medication> {
     Value<int>? patientId,
     Value<String>? name,
     Value<String>? dosage,
+    Value<String>? form,
+    Value<double?>? strengthValue,
+    Value<String?>? strengthUnit,
+    Value<double>? amountPerDose,
+    Value<String>? amountUnit,
     Value<String?>? photoPath,
     Value<String>? scheduleType,
     Value<DateTime>? startDateTime,
     Value<int>? totalPills,
     Value<int>? pillsRemaining,
+    Value<String>? quantityUnit,
     Value<String?>? notes,
     Value<bool>? isActive,
     Value<DateTime>? createdAt,
@@ -1457,11 +1731,17 @@ class MedicationsCompanion extends UpdateCompanion<Medication> {
       patientId: patientId ?? this.patientId,
       name: name ?? this.name,
       dosage: dosage ?? this.dosage,
+      form: form ?? this.form,
+      strengthValue: strengthValue ?? this.strengthValue,
+      strengthUnit: strengthUnit ?? this.strengthUnit,
+      amountPerDose: amountPerDose ?? this.amountPerDose,
+      amountUnit: amountUnit ?? this.amountUnit,
       photoPath: photoPath ?? this.photoPath,
       scheduleType: scheduleType ?? this.scheduleType,
       startDateTime: startDateTime ?? this.startDateTime,
       totalPills: totalPills ?? this.totalPills,
       pillsRemaining: pillsRemaining ?? this.pillsRemaining,
+      quantityUnit: quantityUnit ?? this.quantityUnit,
       notes: notes ?? this.notes,
       isActive: isActive ?? this.isActive,
       createdAt: createdAt ?? this.createdAt,
@@ -1483,6 +1763,21 @@ class MedicationsCompanion extends UpdateCompanion<Medication> {
     if (dosage.present) {
       map['dosage'] = Variable<String>(dosage.value);
     }
+    if (form.present) {
+      map['form'] = Variable<String>(form.value);
+    }
+    if (strengthValue.present) {
+      map['strength_value'] = Variable<double>(strengthValue.value);
+    }
+    if (strengthUnit.present) {
+      map['strength_unit'] = Variable<String>(strengthUnit.value);
+    }
+    if (amountPerDose.present) {
+      map['amount_per_dose'] = Variable<double>(amountPerDose.value);
+    }
+    if (amountUnit.present) {
+      map['amount_unit'] = Variable<String>(amountUnit.value);
+    }
     if (photoPath.present) {
       map['photo_path'] = Variable<String>(photoPath.value);
     }
@@ -1497,6 +1792,9 @@ class MedicationsCompanion extends UpdateCompanion<Medication> {
     }
     if (pillsRemaining.present) {
       map['pills_remaining'] = Variable<int>(pillsRemaining.value);
+    }
+    if (quantityUnit.present) {
+      map['quantity_unit'] = Variable<String>(quantityUnit.value);
     }
     if (notes.present) {
       map['notes'] = Variable<String>(notes.value);
@@ -1517,11 +1815,17 @@ class MedicationsCompanion extends UpdateCompanion<Medication> {
           ..write('patientId: $patientId, ')
           ..write('name: $name, ')
           ..write('dosage: $dosage, ')
+          ..write('form: $form, ')
+          ..write('strengthValue: $strengthValue, ')
+          ..write('strengthUnit: $strengthUnit, ')
+          ..write('amountPerDose: $amountPerDose, ')
+          ..write('amountUnit: $amountUnit, ')
           ..write('photoPath: $photoPath, ')
           ..write('scheduleType: $scheduleType, ')
           ..write('startDateTime: $startDateTime, ')
           ..write('totalPills: $totalPills, ')
           ..write('pillsRemaining: $pillsRemaining, ')
+          ..write('quantityUnit: $quantityUnit, ')
           ..write('notes: $notes, ')
           ..write('isActive: $isActive, ')
           ..write('createdAt: $createdAt')
@@ -3238,11 +3542,17 @@ typedef $$MedicationsTableCreateCompanionBuilder =
       required int patientId,
       required String name,
       required String dosage,
+      Value<String> form,
+      Value<double?> strengthValue,
+      Value<String?> strengthUnit,
+      Value<double> amountPerDose,
+      Value<String> amountUnit,
       Value<String?> photoPath,
       required String scheduleType,
       required DateTime startDateTime,
       required int totalPills,
       required int pillsRemaining,
+      Value<String> quantityUnit,
       Value<String?> notes,
       Value<bool> isActive,
       Value<DateTime> createdAt,
@@ -3253,11 +3563,17 @@ typedef $$MedicationsTableUpdateCompanionBuilder =
       Value<int> patientId,
       Value<String> name,
       Value<String> dosage,
+      Value<String> form,
+      Value<double?> strengthValue,
+      Value<String?> strengthUnit,
+      Value<double> amountPerDose,
+      Value<String> amountUnit,
       Value<String?> photoPath,
       Value<String> scheduleType,
       Value<DateTime> startDateTime,
       Value<int> totalPills,
       Value<int> pillsRemaining,
+      Value<String> quantityUnit,
       Value<String?> notes,
       Value<bool> isActive,
       Value<DateTime> createdAt,
@@ -3353,6 +3669,31 @@ class $$MedicationsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get form => $composableBuilder(
+    column: $table.form,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get strengthValue => $composableBuilder(
+    column: $table.strengthValue,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get strengthUnit => $composableBuilder(
+    column: $table.strengthUnit,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get amountPerDose => $composableBuilder(
+    column: $table.amountPerDose,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get amountUnit => $composableBuilder(
+    column: $table.amountUnit,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<String> get photoPath => $composableBuilder(
     column: $table.photoPath,
     builder: (column) => ColumnFilters(column),
@@ -3375,6 +3716,11 @@ class $$MedicationsTableFilterComposer
 
   ColumnFilters<int> get pillsRemaining => $composableBuilder(
     column: $table.pillsRemaining,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get quantityUnit => $composableBuilder(
+    column: $table.quantityUnit,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3491,6 +3837,31 @@ class $$MedicationsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get form => $composableBuilder(
+    column: $table.form,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get strengthValue => $composableBuilder(
+    column: $table.strengthValue,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get strengthUnit => $composableBuilder(
+    column: $table.strengthUnit,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get amountPerDose => $composableBuilder(
+    column: $table.amountPerDose,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get amountUnit => $composableBuilder(
+    column: $table.amountUnit,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get photoPath => $composableBuilder(
     column: $table.photoPath,
     builder: (column) => ColumnOrderings(column),
@@ -3513,6 +3884,11 @@ class $$MedicationsTableOrderingComposer
 
   ColumnOrderings<int> get pillsRemaining => $composableBuilder(
     column: $table.pillsRemaining,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get quantityUnit => $composableBuilder(
+    column: $table.quantityUnit,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -3573,6 +3949,29 @@ class $$MedicationsTableAnnotationComposer
   GeneratedColumn<String> get dosage =>
       $composableBuilder(column: $table.dosage, builder: (column) => column);
 
+  GeneratedColumn<String> get form =>
+      $composableBuilder(column: $table.form, builder: (column) => column);
+
+  GeneratedColumn<double> get strengthValue => $composableBuilder(
+    column: $table.strengthValue,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get strengthUnit => $composableBuilder(
+    column: $table.strengthUnit,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get amountPerDose => $composableBuilder(
+    column: $table.amountPerDose,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get amountUnit => $composableBuilder(
+    column: $table.amountUnit,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get photoPath =>
       $composableBuilder(column: $table.photoPath, builder: (column) => column);
 
@@ -3593,6 +3992,11 @@ class $$MedicationsTableAnnotationComposer
 
   GeneratedColumn<int> get pillsRemaining => $composableBuilder(
     column: $table.pillsRemaining,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get quantityUnit => $composableBuilder(
+    column: $table.quantityUnit,
     builder: (column) => column,
   );
 
@@ -3715,11 +4119,17 @@ class $$MedicationsTableTableManager
                 Value<int> patientId = const Value.absent(),
                 Value<String> name = const Value.absent(),
                 Value<String> dosage = const Value.absent(),
+                Value<String> form = const Value.absent(),
+                Value<double?> strengthValue = const Value.absent(),
+                Value<String?> strengthUnit = const Value.absent(),
+                Value<double> amountPerDose = const Value.absent(),
+                Value<String> amountUnit = const Value.absent(),
                 Value<String?> photoPath = const Value.absent(),
                 Value<String> scheduleType = const Value.absent(),
                 Value<DateTime> startDateTime = const Value.absent(),
                 Value<int> totalPills = const Value.absent(),
                 Value<int> pillsRemaining = const Value.absent(),
+                Value<String> quantityUnit = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
@@ -3728,11 +4138,17 @@ class $$MedicationsTableTableManager
                 patientId: patientId,
                 name: name,
                 dosage: dosage,
+                form: form,
+                strengthValue: strengthValue,
+                strengthUnit: strengthUnit,
+                amountPerDose: amountPerDose,
+                amountUnit: amountUnit,
                 photoPath: photoPath,
                 scheduleType: scheduleType,
                 startDateTime: startDateTime,
                 totalPills: totalPills,
                 pillsRemaining: pillsRemaining,
+                quantityUnit: quantityUnit,
                 notes: notes,
                 isActive: isActive,
                 createdAt: createdAt,
@@ -3743,11 +4159,17 @@ class $$MedicationsTableTableManager
                 required int patientId,
                 required String name,
                 required String dosage,
+                Value<String> form = const Value.absent(),
+                Value<double?> strengthValue = const Value.absent(),
+                Value<String?> strengthUnit = const Value.absent(),
+                Value<double> amountPerDose = const Value.absent(),
+                Value<String> amountUnit = const Value.absent(),
                 Value<String?> photoPath = const Value.absent(),
                 required String scheduleType,
                 required DateTime startDateTime,
                 required int totalPills,
                 required int pillsRemaining,
+                Value<String> quantityUnit = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
@@ -3756,11 +4178,17 @@ class $$MedicationsTableTableManager
                 patientId: patientId,
                 name: name,
                 dosage: dosage,
+                form: form,
+                strengthValue: strengthValue,
+                strengthUnit: strengthUnit,
+                amountPerDose: amountPerDose,
+                amountUnit: amountUnit,
                 photoPath: photoPath,
                 scheduleType: scheduleType,
                 startDateTime: startDateTime,
                 totalPills: totalPills,
                 pillsRemaining: pillsRemaining,
+                quantityUnit: quantityUnit,
                 notes: notes,
                 isActive: isActive,
                 createdAt: createdAt,

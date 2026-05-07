@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/repositories/medication_repository.dart';
 import '../../../data/local/database.dart';
+import '../../../providers/dashboard_provider.dart';
 import '../../add_medication/screens/add_medication_screen.dart';
 
 class MedicationDetailScreen extends ConsumerWidget {

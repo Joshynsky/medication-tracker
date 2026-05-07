@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../data/repositories/medication_repository.dart';
 import '../../../services/notification_service.dart';
 import '../../../data/repositories/medication_repository.dart';
 
@@ -97,6 +98,40 @@ class DeveloperScreen extends ConsumerWidget {
           const SizedBox(height: 24),
           Text('Danger Zone', style: theme.textTheme.titleMedium?.copyWith(color: Colors.red)),
           const SizedBox(height: 8),
+          _TestButton(
+            icon: Icons.science,
+            title: "Create Test Medication",
+            subtitle: "Adds a 21-pill medication starting April 3, 15 taken already",
+            onTap: () async {
+              final repo = ref.read(medicationRepositoryProvider);
+              final patientId = await repo.ensureDefaultUserAndPatient();
+              
+              final startDate = DateTime(2026, 4, 3, 8, 0);
+              final medId = await repo.saveMedication(
+                patientId: patientId,
+                name: "Test Medicine",
+                dosage: "500mg",
+                scheduleType: "once_daily",
+                startDateTime: startDate,
+                totalPills: 21,
+                notes: "Test medication for debugging",
+                times: [{"hour": 8, "minute": 0}],
+                intervalHours: 24,
+                customDays: {},
+              );
+              
+              // Manually mark 15 doses as taken (April 3-17)
+              final allDoses = await repo.getDoseHistory(medId);
+              allDoses.sort((a, b) => a.scheduledTime.compareTo(b.scheduledTime));
+              for (int i = 0; i < 15 && i < allDoses.length; i++) {
+                await repo.confirmDose(allDoses[i].id, medId);
+              }
+              
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text("Test medication created! 15 of 21 pills taken.")),
+              );
+            },
+          ),
           _TestButton(
             icon: Icons.delete_forever,
             title: 'Reset All Data',

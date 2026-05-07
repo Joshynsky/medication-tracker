@@ -70,7 +70,7 @@ class _StepTwoScheduleState extends ConsumerState<StepTwoSchedule> {
           ),
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
-            initialValue: scheduleType,
+            value: scheduleType,
             decoration: const InputDecoration(
               border: OutlineInputBorder(),
               prefixIcon: Icon(Icons.schedule_outlined),

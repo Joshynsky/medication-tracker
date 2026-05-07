@@ -1,5 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../data/repositories/medication_repository.dart';
+import '../../../providers/dashboard_provider.dart';
 import '../../../data/local/database.dart';
 
 class TimeSlot {
@@ -26,11 +26,10 @@ class TimeSlot {
   bool get isMissed => doses.any((d) => d.status == 'missed');
 }
 
-final timelineProvider = FutureProvider<List<TimeSlot>>((ref) async {
-  final repo = ref.watch(medicationRepositoryProvider);
-  final patientId = await repo.ensureDefaultUserAndPatient();
-  final todaysDoses = await repo.getTodaysDoses(patientId);
-  final medications = await repo.getMedications(patientId);
+final timelineProvider = Provider<List<TimeSlot>>((ref) {
+  final dashState = ref.watch(dashboardProvider);
+  final todaysDoses = dashState.todaysDoses;
+  final medications = dashState.medications;
 
   final Map<String, List<DoseEvent>> grouped = {};
   for (final dose in todaysDoses) {
@@ -43,10 +42,14 @@ final timelineProvider = FutureProvider<List<TimeSlot>>((ref) async {
   final now = DateTime.now();
 
   for (final entry in grouped.entries) {
+    if (entry.value.isEmpty) continue;
     final dose = entry.value.first;
-    final meds = entry.value.map((d) {
-      return medications.firstWhere((m) => m.id == d.medicationId);
-    }).toList();
+    final meds = <Medication>[];
+    for (final d in entry.value) {
+      try {
+        meds.add(medications.firstWhere((m) => m.id == d.medicationId));
+      } catch (_) {}
+    }
 
     String status;
     if (entry.value.every((d) => d.status == 'taken')) {
@@ -60,14 +63,12 @@ final timelineProvider = FutureProvider<List<TimeSlot>>((ref) async {
       status = 'past';
     }
 
-    slots.add(
-      TimeSlot(
-        time: dose.scheduledTime,
-        doses: entry.value,
-        medications: meds,
-        status: status,
-      ),
-    );
+    slots.add(TimeSlot(
+      time: dose.scheduledTime,
+      doses: entry.value,
+      medications: meds,
+      status: status,
+    ));
   }
 
   slots.sort((a, b) => a.time.compareTo(b.time));
