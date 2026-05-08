@@ -135,7 +135,7 @@ class MedicationRepository {
         break;
     }
     final doses = totalPills != null && totalPills > 0 ? doseTimes.take(totalPills) : doseTimes;
-    return doses.where((d) => d.isAfter(DateTime.now())).toList();
+    return doses.toList();
   }
 
   Future<List<Medication>> getMedications(int patientId) {
@@ -166,6 +166,14 @@ class MedicationRepository {
   Future<void> deleteMedication(int medicationId) async {
     await AlarmService.cancelMedicationAlarms(medicationId);
     await (_db.update(_db.medications)..where((t) => t.id.equals(medicationId))).write(const MedicationsCompanion(isActive: Value(false)));
+  }
+
+  Future<void> resetAllData() async {
+    await _db.delete(_db.doseEvents).go();
+    await _db.delete(_db.scheduleTimes).go();
+    await _db.delete(_db.medications).go();
+    await _db.delete(_db.patients).go();
+    await _db.delete(_db.users).go();
   }
 
   Future<List<DoseEvent>> getDoseHistory(int medicationId) async {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:collection/collection.dart';
 import '../../../providers/dashboard_provider.dart';
 import '../../../data/local/database.dart';
 import '../../../shared/widgets/wave_clipper.dart';
@@ -14,6 +15,8 @@ class DashboardScreen extends ConsumerStatefulWidget {
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   DateTime _now = DateTime.now();
+
+  final ScrollController _dotsController = ScrollController();
 
   @override
   void initState() {
@@ -55,7 +58,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       if (med.amountPerDose != null &&
           med.amountUnit != null &&
           med.amountPerDose! > 0) {
-        return '${med.strengthValue!.toInt()}${med.strengthUnit} · Take ${med.amountPerDose!.toInt()} ${med.amountUnit}';
+        return '${med.strengthValue!.toInt()}${med.strengthUnit} \u00b7 Take ${med.amountPerDose!.toInt()} ${med.amountUnit}';
       }
       return '${med.strengthValue!.toInt()}${med.strengthUnit}';
     }
@@ -83,6 +86,60 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         _windowMinutes(scheduleType, intervalHours);
   }
 
+  List<DateTime> _getExpectedDoseTimesToday(Medication med) {
+    final times = <DateTime>[];
+    final today = DateTime(_now.year, _now.month, _now.day);
+    final tomorrow = today.add(const Duration(days: 1));
+    final startHour = med.startDateTime.hour;
+    final startMinute = med.startDateTime.minute;
+
+    if (med.scheduleType == 'once_daily') {
+      times.add(
+        DateTime(today.year, today.month, today.day, startHour, startMinute),
+      );
+      return times;
+    }
+
+    if (med.scheduleType == 'every_x_hours') {
+      int intervalH = 4; // Default, will be overridden
+      // Calculate backwards from start time to find today's anchor
+      var anchor = med.startDateTime;
+      while (anchor.isAfter(today)) {
+        anchor = anchor.subtract(Duration(hours: intervalH));
+      }
+      while (anchor.add(Duration(hours: intervalH)).isBefore(today) ||
+          anchor.isBefore(today)) {
+        anchor = anchor.add(Duration(hours: intervalH));
+      }
+      // Generate all times for today
+      var d = anchor;
+      while (d.isBefore(tomorrow)) {
+        if (d.isAfter(today) || d == today) {
+          times.add(DateTime(d.year, d.month, d.day, d.hour, d.minute));
+        }
+        d = d.add(Duration(hours: intervalH));
+      }
+      return times;
+    }
+
+    // Default: just the start time
+    times.add(
+      DateTime(today.year, today.month, today.day, startHour, startMinute),
+    );
+    return times;
+  }
+
+  int _parseTimeToMinutes(String timeStr) {
+    final parts = timeStr.split(' ');
+    final timeParts = parts[0].split(':');
+    var hour = int.parse(timeParts[0]);
+    final minute = int.parse(timeParts[1]);
+    final amPm = parts[1];
+    if (amPm == 'PM' && hour != 12) hour += 12;
+    if (amPm == 'AM' && hour == 12) hour = 0;
+    return hour * 60 + minute;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -105,9 +162,17 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
     DoseEvent? nextDose;
     try {
-      nextDose = doses.firstWhere((d) => d.status == 'pending');
+      nextDose = doses.firstWhere(
+        (d) =>
+            d.status == 'pending' &&
+            _now.difference(d.scheduledTime).inMinutes < 60,
+      );
     } catch (_) {
-      if (doses.isNotEmpty) nextDose = doses.first;
+      try {
+        nextDose = doses.firstWhere((d) => d.status == 'pending');
+      } catch (_) {
+        if (doses.isNotEmpty) nextDose = doses.first;
+      }
     }
 
     String schedType = 'once_daily';
@@ -176,7 +241,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
     String cardTitle, cardSubtitle;
     if (allCompletedToday) {
-      cardTitle = 'All done! 🎉';
+      cardTitle = 'All done! \u{1f389}';
       cardSubtitle = 'No more doses today';
     } else if (allDone) {
       cardTitle = 'All taken!';
@@ -192,434 +257,578 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       cardSubtitle = _countdownText(diff);
     }
 
+    // Build time dots from expected schedules
     final timeDots = <String, String>{};
-    for (final d in doses) {
-      final k = _formatTime(d.scheduledTime);
-      if (d.status == 'taken') {
-        timeDots[k] = 'taken';
-      } else if (timeDots[k] != 'taken') {
-        timeDots[k] = d.status ?? 'pending';
+    for (final med in meds) {
+      final medDoses = doses.where((d) => d.medicationId == med.id).toList();
+      final expectedTimes = _getExpectedDoseTimesToday(med);
+      for (final expectedTime in expectedTimes) {
+        final k = _formatTime(expectedTime);
+        final existingDose = medDoses.firstWhereOrNull(
+          (d) =>
+              d.scheduledTime.hour == expectedTime.hour &&
+              d.scheduledTime.minute == expectedTime.minute,
+        );
+        if (existingDose != null) {
+          if (existingDose.status == 'pending' &&
+              _now.difference(existingDose.scheduledTime).inMinutes >
+                  _windowMinutes(schedType, intervalH)) {
+            // Past window but not taken = missed
+            if (timeDots[k] != 'taken') timeDots[k] = 'missed';
+          } else if (timeDots[k] != 'taken') {
+            timeDots[k] = existingDose.status;
+          }
+        }
       }
     }
-    final sortedDots = timeDots.keys.toList();
+    final sortedDots = timeDots.keys.toList()
+      ..sort(
+        (a, b) => _parseTimeToMinutes(a).compareTo(_parseTimeToMinutes(b)),
+      );
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('MediTrack'), centerTitle: true),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          Text(
-            _greeting(),
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+    final body = ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        Text(
+          _greeting(),
+          style: theme.textTheme.headlineSmall?.copyWith(
+            fontWeight: FontWeight.bold,
           ),
-          const SizedBox(height: 20),
-          Container(
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surface,
-              borderRadius: BorderRadius.circular(24),
-              boxShadow: [
-                BoxShadow(
-                  color: cardColors[0].withOpacity(0.2),
-                  blurRadius: 20,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ClipPath(
-                  clipper: WaveClipper(),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.fromLTRB(24, 28, 24, 50),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: cardColors,
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                    ),
-                    child: Column(
-                      children: [
-                        Icon(cardIcon, color: Colors.white, size: 32),
-                        const SizedBox(height: 10),
-                        Text(
-                          cardTitle,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            color: Colors.white.withOpacity(0.9),
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          cardSubtitle,
-                          style: theme.textTheme.displaySmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                        if (nextDose != null &&
-                            !allCompletedToday &&
-                            !pastWindow &&
-                            pendingInSlot > 0) ...[
-                          const SizedBox(height: 10),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.25),
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: Text(
-                              inWindow ? '🔔 Window open' : '⏱ Upcoming',
-                              style: theme.textTheme.labelLarge?.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ],
-                        if (pastWindow && pendingInSlot > 0) ...[
-                          const SizedBox(height: 10),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.25),
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: Text(
-                              'Window passed',
-                              style: theme.textTheme.labelLarge?.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
+        ),
+        const SizedBox(height: 20),
+        Container(
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: cardColors[0].withOpacity(0.2),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ClipPath(
+                clipper: WaveClipper(),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.fromLTRB(24, 28, 24, 50),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: cardColors,
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
                   ),
+                  child: Column(
+                    children: [
+                      Icon(cardIcon, color: Colors.white, size: 32),
+                      const SizedBox(height: 10),
+                      Text(
+                        cardTitle,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: Colors.white.withOpacity(0.9),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        cardSubtitle,
+                        style: theme.textTheme.displaySmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                      if (nextDose != null &&
+                          !allCompletedToday &&
+                          !pastWindow &&
+                          pendingInSlot > 0) ...[
+                        const SizedBox(height: 10),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.25),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Text(
+                            inWindow
+                                ? '\u{1f514} Window open'
+                                : '\u{23f1} Upcoming',
+                            style: theme.textTheme.labelLarge?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                      if (pastWindow && pendingInSlot > 0) ...[
+                        const SizedBox(height: 10),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.25),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Text(
+                            'Window passed',
+                            style: theme.textTheme.labelLarge?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
-                if (cardMeds.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      children: [
-                        ...cardMeds.asMap().entries.map((entry) {
-                          final med = entry.value;
-                          final dose = doses.firstWhere(
-                            (d) =>
-                                d.medicationId == med.id &&
-                                d.scheduledTime.hour ==
-                                    nextDose!.scheduledTime.hour &&
-                                d.scheduledTime.minute ==
-                                    nextDose!.scheduledTime.minute,
-                            orElse: () => nextDose!,
-                          );
-                          final isTaken = dose.status == 'taken';
-                          return Container(
-                            margin: const EdgeInsets.only(bottom: 8),
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: isTaken
-                                  ? Colors.green.withOpacity(0.06)
-                                  : theme.colorScheme.surfaceContainerLow,
-                              borderRadius: BorderRadius.circular(14),
-                              border: isTaken
-                                  ? Border.all(
-                                      color: Colors.green.withOpacity(0.2),
-                                    )
-                                  : null,
-                            ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 40,
-                                  height: 40,
-                                  decoration: BoxDecoration(
-                                    color: isTaken
-                                        ? Colors.green.withOpacity(0.12)
-                                        : theme.colorScheme.primaryContainer,
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: Icon(
-                                    isTaken
-                                        ? Icons.check_circle
-                                        : Icons.medication,
-                                    size: 20,
-                                    color: isTaken
-                                        ? Colors.green
-                                        : theme.colorScheme.primary,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        med.name,
-                                        style: theme.textTheme.titleSmall
-                                            ?.copyWith(
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                      ),
-                                      Text(
-                                        _dosageDisplay(med),
-                                        style: theme.textTheme.bodySmall
-                                            ?.copyWith(
-                                              color: theme
-                                                  .colorScheme
-                                                  .onSurfaceVariant,
-                                            ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                if (med.totalPills > 0)
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 10,
-                                      vertical: 4,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: theme
-                                          .colorScheme
-                                          .surfaceContainerHighest,
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: Text(
-                                      '${med.pillsRemaining} left',
-                                      style: theme.textTheme.labelSmall,
-                                    ),
-                                  ),
-                                if (inWindow && !isTaken) ...[
-                                  const SizedBox(width: 10),
-                                  FilledButton(
-                                    onPressed: () => notifier.confirmDose(
-                                      dose.id,
-                                      dose.medicationId,
-                                    ),
-                                    style: FilledButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 14,
-                                        vertical: 8,
-                                      ),
-                                      minimumSize: Size.zero,
-                                      backgroundColor: cardColors[0],
-                                      foregroundColor: Colors.white,
-                                    ),
-                                    child: const Text('Take'),
-                                  ),
-                                ] else if (isTaken)
-                                  const Padding(
-                                    padding: EdgeInsets.only(left: 8),
-                                    child: Icon(
-                                      Icons.check_circle,
-                                      color: Colors.green,
-                                      size: 24,
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          );
-                        }),
-                        if (inWindow && pendingInSlot > 0) ...[
-                          const SizedBox(height: 8),
-                          Row(
+              ),
+              if (cardMeds.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    children: [
+                      ...cardMeds.asMap().entries.map((entry) {
+                        final med = entry.value;
+                        final dose = doses.firstWhere(
+                          (d) =>
+                              d.medicationId == med.id &&
+                              d.scheduledTime.hour ==
+                                  nextDose!.scheduledTime.hour &&
+                              d.scheduledTime.minute ==
+                                  nextDose!.scheduledTime.minute,
+                          orElse: () => nextDose!,
+                        );
+                        final isTaken = dose.status == 'taken';
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: isTaken
+                                ? Colors.green.withOpacity(0.06)
+                                : theme.colorScheme.surfaceContainerLow,
+                            borderRadius: BorderRadius.circular(14),
+                            border: isTaken
+                                ? Border.all(
+                                    color: Colors.green.withOpacity(0.2),
+                                  )
+                                : null,
+                          ),
+                          child: Row(
                             children: [
-                              Expanded(
-                                child: OutlinedButton(
-                                  onPressed: () {
-                                    for (final d in doses.where(
-                                      (d) =>
-                                          d.scheduledTime.hour ==
-                                              nextDose!.scheduledTime.hour &&
-                                          d.scheduledTime.minute ==
-                                              nextDose!.scheduledTime.minute &&
-                                          d.status == 'pending',
-                                    )) {
-                                      notifier.snoozeDose(d.id);
-                                    }
-                                  },
-                                  style: OutlinedButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 14,
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(14),
-                                    ),
-                                    side: BorderSide(
-                                      color: Colors.orange.withOpacity(0.5),
-                                    ),
-                                  ),
-                                  child: const Text(
-                                    'Snooze',
-                                    style: TextStyle(color: Colors.orange),
-                                  ),
+                              Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  color: isTaken
+                                      ? Colors.green.withOpacity(0.12)
+                                      : theme.colorScheme.primaryContainer,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Icon(
+                                  isTaken
+                                      ? Icons.check_circle
+                                      : Icons.medication,
+                                  size: 20,
+                                  color: isTaken
+                                      ? Colors.green
+                                      : theme.colorScheme.primary,
                                 ),
                               ),
                               const SizedBox(width: 12),
                               Expanded(
-                                flex: 2,
-                                child: FilledButton.icon(
-                                  onPressed: () {
-                                    for (final d in doses.where(
-                                      (d) =>
-                                          d.scheduledTime.hour ==
-                                              nextDose!.scheduledTime.hour &&
-                                          d.scheduledTime.minute ==
-                                              nextDose!.scheduledTime.minute &&
-                                          d.status == 'pending',
-                                    )) {
-                                      notifier.confirmDose(
-                                        d.id,
-                                        d.medicationId,
-                                      );
-                                    }
-                                  },
-                                  icon: const Icon(
-                                    Icons.check_circle,
-                                    size: 18,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      med.name,
+                                      style: theme.textTheme.titleSmall
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                    ),
+                                    Text(
+                                      _dosageDisplay(med),
+                                      style: theme.textTheme.bodySmall
+                                          ?.copyWith(
+                                            color: theme
+                                                .colorScheme
+                                                .onSurfaceVariant,
+                                          ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (med.totalPills > 0)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 4,
                                   ),
-                                  label: const Text('I took them all'),
+                                  decoration: BoxDecoration(
+                                    color: theme
+                                        .colorScheme
+                                        .surfaceContainerHighest,
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Text(
+                                    '${med.pillsRemaining} left',
+                                    style: theme.textTheme.labelSmall,
+                                  ),
+                                ),
+                              if (inWindow && !isTaken) ...[
+                                const SizedBox(width: 10),
+                                FilledButton(
+                                  onPressed: () => notifier.confirmDose(
+                                    dose.id,
+                                    dose.medicationId,
+                                  ),
                                   style: FilledButton.styleFrom(
                                     padding: const EdgeInsets.symmetric(
-                                      vertical: 14,
+                                      horizontal: 14,
+                                      vertical: 8,
                                     ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(14),
-                                    ),
+                                    minimumSize: Size.zero,
                                     backgroundColor: cardColors[0],
                                     foregroundColor: Colors.white,
                                   ),
+                                  child: const Text('Take'),
+                                ),
+                              ] else if (isTaken)
+                                const Padding(
+                                  padding: EdgeInsets.only(left: 8),
+                                  child: Icon(
+                                    Icons.check_circle,
+                                    color: Colors.green,
+                                    size: 24,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        );
+                      }),
+                      if (inWindow && pendingInSlot > 0) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () {
+                                  for (final d in doses.where(
+                                    (d) =>
+                                        d.scheduledTime.hour ==
+                                            nextDose!.scheduledTime.hour &&
+                                        d.scheduledTime.minute ==
+                                            nextDose!.scheduledTime.minute &&
+                                        d.status == 'pending',
+                                  )) {
+                                    notifier.snoozeDose(d.id);
+                                  }
+                                },
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                  side: BorderSide(
+                                    color: Colors.orange.withOpacity(0.5),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'Snooze',
+                                  style: TextStyle(color: Colors.orange),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              flex: 2,
+                              child: FilledButton.icon(
+                                onPressed: () {
+                                  for (final d in doses.where(
+                                    (d) =>
+                                        d.scheduledTime.hour ==
+                                            nextDose!.scheduledTime.hour &&
+                                        d.scheduledTime.minute ==
+                                            nextDose!.scheduledTime.minute &&
+                                        d.status == 'pending',
+                                  )) {
+                                    notifier.confirmDose(d.id, d.medicationId);
+                                  }
+                                },
+                                icon: const Icon(Icons.check_circle, size: 18),
+                                label: const Text('I took them all'),
+                                style: FilledButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                  backgroundColor: cardColors[0],
+                                  foregroundColor: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                      if (allDone && !allCompletedToday)
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.celebration,
+                                color: Colors.green,
+                                size: 20,
+                              ),
+                              SizedBox(width: 8),
+                              Text(
+                                'All doses confirmed! \u{1f389}',
+                                style: TextStyle(
+                                  color: Colors.green,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
                                 ),
                               ),
                             ],
                           ),
-                        ],
-                        if (allDone && !allCompletedToday)
-                          Container(
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(
-                              color: Colors.green.withOpacity(0.08),
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: const Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.celebration,
-                                  color: Colors.green,
-                                  size: 20,
-                                ),
-                                SizedBox(width: 8),
-                                Text(
-                                  'All doses confirmed! 🎉',
-                                  style: TextStyle(
-                                    color: Colors.green,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                              ],
-                            ),
+                        ),
+                      if (pastWindow && pendingInSlot > 0)
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withOpacity(0.06),
+                            borderRadius: BorderRadius.circular(14),
                           ),
-                        if (pastWindow && pendingInSlot > 0)
-                          Container(
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(
-                              color: Colors.red.withOpacity(0.06),
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: const Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.warning_amber,
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.warning_amber,
+                                color: Colors.red,
+                                size: 20,
+                              ),
+                              SizedBox(width: 8),
+                              Text(
+                                'Dose window passed',
+                                style: TextStyle(
                                   color: Colors.red,
-                                  size: 20,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
                                 ),
-                                SizedBox(width: 8),
-                                Text(
-                                  'Dose window passed',
-                                  style: TextStyle(
-                                    color: Colors.red,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
-                        if (allCompletedToday)
-                          Container(
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(
-                              color: Colors.green.withOpacity(0.08),
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: const Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.celebration,
+                        ),
+                      if (allCompletedToday)
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.celebration,
+                                color: Colors.green,
+                                size: 20,
+                              ),
+                              SizedBox(width: 8),
+                              Text(
+                                'Great job today! \u{1f31f}',
+                                style: TextStyle(
                                   color: Colors.green,
-                                  size: 20,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
                                 ),
-                                SizedBox(width: 8),
-                                Text(
-                                  'Great job today! 🌟',
-                                  style: TextStyle(
-                                    color: Colors.green,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                              ],
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 28),
+        if (total > 0) ...[
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '$taken of $total taken',
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
-                      ],
+                          Text(
+                            remaining > 0
+                                ? '$remaining remaining \u{1f31f}'
+                                : 'All done! \u{1f389}',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
+                    Text(
+                      total > 0 ? '${((taken / total) * 100).round()}%' : '0%',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: total > 0 ? taken / total : 0,
+                    minHeight: 6,
+                    backgroundColor: theme.colorScheme.surfaceContainerHighest,
                   ),
+                ),
               ],
             ),
           ),
-          const SizedBox(height: 28),
-          if (total > 0) ...[
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerLow,
-                borderRadius: BorderRadius.circular(16),
+          if (sortedDots.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Row(
+                children: sortedDots.map((time) {
+                  final s = timeDots[time];
+                  IconData ic;
+                  Color c;
+                  if (s == 'taken') {
+                    ic = Icons.check_circle;
+                    c = Colors.green;
+                  } else if (s == 'missed') {
+                    ic = Icons.cancel;
+                    c = Colors.red;
+                  } else if (s == 'pending') {
+                    ic = Icons.access_time;
+                    c = theme.colorScheme.primary;
+                  } else {
+                    ic = Icons.circle_outlined;
+                    c = Colors.grey;
+                  }
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: c.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: c.withOpacity(0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(ic, size: 14, color: c),
+                          const SizedBox(width: 6),
+                          Text(
+                            time,
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              fontWeight: FontWeight.w500,
+                              color: c,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }).toList(),
               ),
-              child: Column(
-                children: [
-                  Row(
+            ),
+          ],
+        ],
+        if (meds.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          Text(
+            'Your medications',
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 10),
+          ...meds.map(
+            (med) => Card(
+              margin: const EdgeInsets.only(bottom: 6),
+              child: InkWell(
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => MedicationDetailScreen(medication: med),
+                  ),
+                ).then((_) => notifier.refresh()),
+                borderRadius: BorderRadius.circular(12),
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Row(
                     children: [
+                      Container(
+                        width: 42,
+                        height: 42,
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primaryContainer,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(
+                          Icons.medication,
+                          color: theme.colorScheme.primary,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              '$taken of $total taken',
+                              med.name,
                               style: theme.textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.w600,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
                             Text(
-                              remaining > 0
-                                  ? '$remaining remaining 🌟'
-                                  : 'All done! 🎉',
+                              _dosageDisplay(med),
                               style: theme.textTheme.bodySmall?.copyWith(
                                 color: theme.colorScheme.onSurfaceVariant,
                               ),
@@ -627,186 +836,59 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           ],
                         ),
                       ),
-                      Text(
-                        total > 0
-                            ? '${((taken / total) * 100).round()}%'
-                            : '0%',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: theme.colorScheme.primary,
+                      if (med.totalPills > 0)
+                        Text(
+                          '${med.pillsRemaining} left',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
                         ),
+                      const SizedBox(width: 6),
+                      Icon(
+                        Icons.chevron_right,
+                        size: 20,
+                        color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ],
                   ),
-                  const SizedBox(height: 10),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: LinearProgressIndicator(
-                      value: total > 0 ? taken / total : 0,
-                      minHeight: 6,
-                      backgroundColor:
-                          theme.colorScheme.surfaceContainerHighest,
+                ),
+              ),
+            ),
+          ),
+        ],
+        if (meds.isEmpty)
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.all(48),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.medication_outlined,
+                    size: 48,
+                    color: theme.colorScheme.primary,
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'No medications yet',
+                    style: theme.textTheme.titleMedium,
+                  ),
+                  Text(
+                    'Tap + to add your first',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ],
               ),
             ),
-            if (sortedDots.isNotEmpty) ...[
-              const SizedBox(height: 14),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: Row(
-                  children: sortedDots.map((time) {
-                    final s = timeDots[time];
-                    IconData ic;
-                    Color c;
-                    if (s == 'taken') {
-                      ic = Icons.check_circle;
-                      c = Colors.green;
-                    } else if (s == 'missed') {
-                      ic = Icons.cancel;
-                      c = Colors.red;
-                    } else {
-                      ic = Icons.access_time;
-                      c = theme.colorScheme.primary;
-                    }
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 16),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.surfaceContainerLow,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(ic, size: 14, color: c),
-                            const SizedBox(width: 6),
-                            Text(
-                              time,
-                              style: theme.textTheme.labelMedium?.copyWith(
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ),
-            ],
-          ],
-          if (meds.isNotEmpty) ...[
-            const SizedBox(height: 24),
-            Text(
-              'Your medications',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 10),
-            ...meds.map(
-              (med) => Card(
-                margin: const EdgeInsets.only(bottom: 6),
-                child: InkWell(
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => MedicationDetailScreen(medication: med),
-                    ),
-                  ).then((_) => notifier.refresh()),
-                  borderRadius: BorderRadius.circular(12),
-                  child: Padding(
-                    padding: const EdgeInsets.all(14),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 42,
-                          height: 42,
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.primaryContainer,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Icon(
-                            Icons.medication,
-                            color: theme.colorScheme.primary,
-                            size: 20,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                med.name,
-                                style: theme.textTheme.titleSmall?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              Text(
-                                _dosageDisplay(med),
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: theme.colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (med.totalPills > 0)
-                          Text(
-                            '${med.pillsRemaining} left',
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        const SizedBox(width: 6),
-                        Icon(
-                          Icons.chevron_right,
-                          size: 20,
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-          if (meds.isEmpty)
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.all(48),
-                child: Column(
-                  children: [
-                    Icon(
-                      Icons.medication_outlined,
-                      size: 48,
-                      color: theme.colorScheme.primary,
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'No medications yet',
-                      style: theme.textTheme.titleMedium,
-                    ),
-                    Text(
-                      'Tap + to add your first',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          const SizedBox(height: 80),
-        ],
-      ),
+          ),
+        const SizedBox(height: 80),
+      ],
+    );
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('MediTrack'), centerTitle: true),
+      body: body,
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => Navigator.push(
           context,

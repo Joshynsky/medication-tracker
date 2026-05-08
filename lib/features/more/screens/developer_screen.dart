@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../data/repositories/medication_repository.dart';
 import '../../../services/notification_service.dart';
 import '../../../data/repositories/medication_repository.dart';
 
@@ -146,11 +145,12 @@ class DeveloperScreen extends ConsumerWidget {
                   actions: [
                     TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
                     FilledButton(
-                      onPressed: () {
-                        // TODO: Add reset functionality
+                      onPressed: () async {
+                        final repo = ref.read(medicationRepositoryProvider);
+                        await repo.resetAllData();
                         Navigator.pop(ctx);
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Reset not implemented yet')),
+                          const SnackBar(content: const Text('All data has been reset! Restart the app.')),
                         );
                       },
                       style: FilledButton.styleFrom(backgroundColor: Colors.red),
