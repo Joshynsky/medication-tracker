@@ -79,7 +79,7 @@ class _StepThreeQuantityState extends ConsumerState<StepThreeQuantity> {
               padding: const EdgeInsets.only(top: 12),
               child: Container(
                 padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(color: theme.colorScheme.primaryContainer.withOpacity(0.3), borderRadius: BorderRadius.circular(8)),
+                decoration: BoxDecoration(color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(8)),
                 child: Row(children: [
                   Icon(Icons.lightbulb_outline, size: 20, color: theme.colorScheme.primary),
                   const SizedBox(width: 8),

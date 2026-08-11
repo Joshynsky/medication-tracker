@@ -56,7 +56,7 @@ class StepPreview extends ConsumerWidget {
 
         Container(
           padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(color: theme.colorScheme.primaryContainer.withOpacity(0.2), borderRadius: BorderRadius.circular(16), border: Border.all(color: theme.colorScheme.primaryContainer)),
+          decoration: BoxDecoration(color: theme.colorScheme.primaryContainer.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(16), border: Border.all(color: theme.colorScheme.primaryContainer)),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
               Container(width: 48, height: 48, decoration: BoxDecoration(color: theme.colorScheme.primaryContainer, borderRadius: BorderRadius.circular(12)), child: Icon(Icons.medication, color: theme.colorScheme.primary)),
@@ -86,7 +86,7 @@ class StepPreview extends ConsumerWidget {
         const SizedBox(height: 24),
         Container(
           padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5), borderRadius: BorderRadius.circular(12)),
+          decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5), borderRadius: BorderRadius.circular(12)),
           child: Row(children: [
             Icon(Icons.notifications_active_outlined, color: theme.colorScheme.primary),
             const SizedBox(width: 12),

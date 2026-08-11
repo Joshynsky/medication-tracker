@@ -23,7 +23,6 @@ class SwipeableDoseCard extends StatefulWidget {
 class _SwipeableDoseCardState extends State<SwipeableDoseCard>
     with SingleTickerProviderStateMixin {
   late AnimationController _anim;
-  late Animation<double> _scale;
   int? _celebratingId;
 
   @override
@@ -33,10 +32,6 @@ class _SwipeableDoseCardState extends State<SwipeableDoseCard>
       duration: const Duration(milliseconds: 500),
       vsync: this,
     );
-    _scale = Tween(
-      begin: 1.0,
-      end: 1.1,
-    ).animate(CurvedAnimation(parent: _anim, curve: Curves.elasticOut));
   }
 
   @override
@@ -131,13 +126,13 @@ class _SwipeableDoseCardState extends State<SwipeableDoseCard>
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: glowColor.withOpacity(0.25),
+              color: glowColor.withValues(alpha: 0.25),
               blurRadius: 30,
               spreadRadius: 2,
               offset: const Offset(0, 8),
             ),
             BoxShadow(
-              color: Colors.black.withOpacity(0.08),
+              color: Colors.black.withValues(alpha: 0.08),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -186,7 +181,7 @@ class _SwipeableDoseCardState extends State<SwipeableDoseCard>
                             Text(
                               'in ${diff.inHours > 0 ? '${diff.inHours}h ' : ''}${diff.inMinutes.remainder(60)}m',
                               style: theme.textTheme.bodyLarge?.copyWith(
-                                color: Colors.white.withOpacity(0.9),
+                                color: Colors.white.withValues(alpha: 0.9),
                               ),
                             ),
                           ],
@@ -197,7 +192,7 @@ class _SwipeableDoseCardState extends State<SwipeableDoseCard>
                               vertical: 6,
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.25),
+                              color: Colors.white.withValues(alpha: 0.25),
                               borderRadius: BorderRadius.circular(16),
                             ),
                             child: Text(
@@ -218,7 +213,7 @@ class _SwipeableDoseCardState extends State<SwipeableDoseCard>
                           Container(
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
+                              color: Colors.white.withValues(alpha: 0.2),
                               shape: BoxShape.circle,
                             ),
                             child: Text(
@@ -289,12 +284,12 @@ class _SwipeableDoseCardState extends State<SwipeableDoseCard>
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
                             color: isTaken
-                                ? Colors.green.withOpacity(0.06)
+                                ? Colors.green.withValues(alpha: 0.06)
                                 : theme.colorScheme.surfaceContainerLow,
                             borderRadius: BorderRadius.circular(14),
                             border: isTaken
                                 ? Border.all(
-                                    color: Colors.green.withOpacity(0.2),
+                                    color: Colors.green.withValues(alpha: 0.2),
                                   )
                                 : null,
                           ),
@@ -306,7 +301,7 @@ class _SwipeableDoseCardState extends State<SwipeableDoseCard>
                                 height: 40,
                                 decoration: BoxDecoration(
                                   color: isTaken
-                                      ? Colors.green.withOpacity(0.12)
+                                      ? Colors.green.withValues(alpha: 0.12)
                                       : theme.colorScheme.primaryContainer,
                                   borderRadius: BorderRadius.circular(10),
                                 ),
@@ -416,7 +411,7 @@ class _SwipeableDoseCardState extends State<SwipeableDoseCard>
                                     borderRadius: BorderRadius.circular(14),
                                   ),
                                   side: BorderSide(
-                                    color: Colors.orange.withOpacity(0.5),
+                                    color: Colors.orange.withValues(alpha: 0.5),
                                   ),
                                 ),
                                 child: const Text(
@@ -457,7 +452,7 @@ class _SwipeableDoseCardState extends State<SwipeableDoseCard>
                                 borderRadius: BorderRadius.circular(14),
                               ),
                               side: BorderSide(
-                                color: Colors.orange.withOpacity(0.5),
+                                color: Colors.orange.withValues(alpha: 0.5),
                               ),
                             ),
                             child: const Text(
@@ -471,7 +466,7 @@ class _SwipeableDoseCardState extends State<SwipeableDoseCard>
                       Container(
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
-                          color: Colors.red.withOpacity(0.06),
+                          color: Colors.red.withValues(alpha: 0.06),
                           borderRadius: BorderRadius.circular(14),
                         ),
                         child: const Row(
@@ -498,7 +493,7 @@ class _SwipeableDoseCardState extends State<SwipeableDoseCard>
                       Container(
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
-                          color: Colors.green.withOpacity(0.08),
+                          color: Colors.green.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(14),
                         ),
                         child: const Row(

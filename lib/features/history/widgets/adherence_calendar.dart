@@ -69,19 +69,19 @@ class AdherenceCalendar extends StatelessWidget {
 
                 switch (day.status) {
                   case 'taken':
-                    bgColor = Colors.green.withOpacity(0.2);
+                    bgColor = Colors.green.withValues(alpha: 0.2);
                     label = '✓';
                     break;
                   case 'missed':
-                    bgColor = Colors.red.withOpacity(0.2);
+                    bgColor = Colors.red.withValues(alpha: 0.2);
                     label = '✗';
                     break;
                   case 'partial':
-                    bgColor = Colors.orange.withOpacity(0.2);
+                    bgColor = Colors.orange.withValues(alpha: 0.2);
                     label = '◐';
                     break;
                   default:
-                    bgColor = Colors.grey.withOpacity(0.1);
+                    bgColor = Colors.grey.withValues(alpha: 0.1);
                     label = '○';
                 }
 

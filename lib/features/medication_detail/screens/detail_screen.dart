@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../data/repositories/medication_repository.dart';
 import '../../../data/local/database.dart';
 import '../../../providers/dashboard_provider.dart';
 
@@ -49,15 +48,15 @@ class MedicationDetailScreen extends ConsumerWidget {
     if (med.strengthValue != null && med.strengthUnit != null && med.strengthValue! > 0) {
       parts.add('${med.strengthValue!.toInt()}${med.strengthUnit}');
     }
-    if (med.amountPerDose != null && med.amountUnit != null && med.amountPerDose! > 0) {
-      parts.add('Take ${med.amountPerDose!.toInt()} ${med.amountUnit}');
+    if (med.amountPerDose > 0) {
+      parts.add('Take ${med.amountPerDose.toInt()} ${med.amountUnit}');
     }
     return parts.isEmpty ? med.dosage : parts.join(' · ');
   }
 
   String _quantityText(Medication med) {
     if (med.totalPills <= 0) return 'Not set';
-    final unit = med.quantityUnit ?? 'units';
+    final unit = med.quantityUnit;
     return '${med.totalPills} $unit';
   }
 
@@ -85,7 +84,7 @@ class MedicationDetailScreen extends ConsumerWidget {
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Container(
             padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(color: theme.colorScheme.primaryContainer.withOpacity(0.2), borderRadius: BorderRadius.circular(16), border: Border.all(color: theme.colorScheme.primaryContainer)),
+            decoration: BoxDecoration(color: theme.colorScheme.primaryContainer.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(16), border: Border.all(color: theme.colorScheme.primaryContainer)),
             child: Column(children: [
               Row(children: [
                 Container(width: 56, height: 56, decoration: BoxDecoration(color: theme.colorScheme.primaryContainer, borderRadius: BorderRadius.circular(16)), child: Icon(Icons.medication, size: 28, color: theme.colorScheme.primary)),
@@ -95,7 +94,7 @@ class MedicationDetailScreen extends ConsumerWidget {
                   const SizedBox(height: 4),
                   Text(_dosageDisplay(medication), style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
                 ])),
-                Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), decoration: BoxDecoration(color: medication.isActive ? Colors.green.withOpacity(0.1) : theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(20)), child: Text(medication.isActive ? 'Active' : 'Inactive', style: theme.textTheme.labelSmall?.copyWith(color: medication.isActive ? Colors.green : theme.colorScheme.onSurfaceVariant))),
+                Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), decoration: BoxDecoration(color: medication.isActive ? Colors.green.withValues(alpha: 0.1) : theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(20)), child: Text(medication.isActive ? 'Active' : 'Inactive', style: theme.textTheme.labelSmall?.copyWith(color: medication.isActive ? Colors.green : theme.colorScheme.onSurfaceVariant))),
               ]),
               if (medication.totalPills > 0) ...[
                 const SizedBox(height: 20), const Divider(), const SizedBox(height: 20),
@@ -103,7 +102,7 @@ class MedicationDetailScreen extends ConsumerWidget {
                   Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text('${adherencePercent.toStringAsFixed(0)}% complete', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
                     const SizedBox(height: 4),
-                    Text('${medication.pillsRemaining} ${medication.quantityUnit ?? 'units'} remaining', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                    Text('${medication.pillsRemaining} ${medication.quantityUnit} remaining', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
                   ])),
                   const SizedBox(width: 16),
                   SizedBox(width: 48, height: 48, child: Stack(alignment: Alignment.center, children: [
@@ -114,7 +113,7 @@ class MedicationDetailScreen extends ConsumerWidget {
                 const SizedBox(height: 12),
                 ClipRRect(borderRadius: BorderRadius.circular(4), child: LinearProgressIndicator(value: adherencePercent / 100, minHeight: 6, backgroundColor: theme.colorScheme.surfaceContainerHighest, valueColor: AlwaysStoppedAnimation<Color>(adherencePercent >= 80 ? Colors.green : theme.colorScheme.primary))),
                 const SizedBox(height: 12),
-                Row(mainAxisAlignment: MainAxisAlignment.center, children: [Text('$pillsTaken of ${medication.totalPills} ${medication.quantityUnit ?? 'units'} taken', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant))]),
+                Row(mainAxisAlignment: MainAxisAlignment.center, children: [Text('$pillsTaken of ${medication.totalPills} ${medication.quantityUnit} taken', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant))]),
               ],
             ]),
           ),
@@ -129,11 +128,11 @@ class MedicationDetailScreen extends ConsumerWidget {
               const Divider(height: 24),
               _InfoRow(icon: Icons.inventory_2, label: 'Quantity', value: _quantityText(medication)),
               const Divider(height: 24),
-              _InfoRow(icon: Icons.checklist, label: 'Taken', value: '$pillsTaken ${medication.quantityUnit ?? 'units'}'),
+              _InfoRow(icon: Icons.checklist, label: 'Taken', value: '$pillsTaken ${medication.quantityUnit}'),
               const Divider(height: 24),
               _InfoRow(icon: Icons.medication, label: 'Dosage', value: _dosageDisplay(medication)),
               const Divider(height: 24),
-              _InfoRow(icon: Icons.category, label: 'Form', value: medication.form ?? 'Not specified'),
+              _InfoRow(icon: Icons.category, label: 'Form', value: medication.form),
             ]),
           ),
           const SizedBox(height: 32),

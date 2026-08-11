@@ -319,7 +319,7 @@ class _StepOneIdentifyState extends ConsumerState<StepOneIdentify> {
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest.withOpacity(
+                  color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 
                     0.5,
                   ),
                   borderRadius: BorderRadius.circular(12),

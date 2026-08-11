@@ -28,7 +28,7 @@ class DoseCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             decoration: BoxDecoration(
-              color: _statusColor().withOpacity(0.15),
+              color: _statusColor().withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
@@ -68,12 +68,12 @@ class DoseCard extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: timeSlot.isTaken
-                  ? Colors.green.withOpacity(0.05)
+                  ? Colors.green.withValues(alpha: 0.05)
                   : theme.colorScheme.surfaceContainerLow,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
                 color: timeSlot.isTaken
-                    ? Colors.green.withOpacity(0.3)
+                    ? Colors.green.withValues(alpha: 0.3)
                     : theme.colorScheme.outlineVariant,
               ),
             ),
@@ -84,7 +84,7 @@ class DoseCard extends StatelessWidget {
                   height: 48,
                   decoration: BoxDecoration(
                     color: timeSlot.isTaken
-                        ? Colors.green.withOpacity(0.1)
+                        ? Colors.green.withValues(alpha: 0.1)
                         : theme.colorScheme.primaryContainer,
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -156,7 +156,7 @@ class DoseCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.green.withOpacity(0.1),
+                color: Colors.green.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: const Row(

@@ -38,7 +38,7 @@ class _FullCalendarState extends ConsumerState<FullCalendar> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: theme.colorScheme.onSurfaceVariant.withOpacity(0.3),
+                color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -197,15 +197,15 @@ class _DayCell extends StatelessWidget {
 
     switch (status) {
       case 'taken':
-        bgColor = Colors.green.withOpacity(0.15);
+        bgColor = Colors.green.withValues(alpha: 0.15);
         dotColor = Colors.green;
         break;
       case 'missed':
-        bgColor = Colors.red.withOpacity(0.15);
+        bgColor = Colors.red.withValues(alpha: 0.15);
         dotColor = Colors.red;
         break;
       case 'partial':
-        bgColor = Colors.orange.withOpacity(0.15);
+        bgColor = Colors.orange.withValues(alpha: 0.15);
         dotColor = Colors.orange;
         break;
       default:

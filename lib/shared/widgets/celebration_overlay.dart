@@ -82,7 +82,7 @@ class _CelebrationOverlayState extends State<CelebrationOverlay>
             children: [
               // Semi-transparent background
               Container(
-                color: Colors.black.withOpacity(0.4),
+                color: Colors.black.withValues(alpha: 0.4),
               ),
               // Confetti
               ..._confetti.map((c) => _buildConfetti(c)),
@@ -98,7 +98,7 @@ class _CelebrationOverlayState extends State<CelebrationOverlay>
                       borderRadius: BorderRadius.circular(24),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
+                          color: Colors.black.withValues(alpha: 0.2),
                           blurRadius: 20,
                           offset: const Offset(0, 10),
                         ),
@@ -111,7 +111,7 @@ class _CelebrationOverlayState extends State<CelebrationOverlay>
                           width: 80,
                           height: 80,
                           decoration: BoxDecoration(
-                            color: Colors.green.withOpacity(0.1),
+                            color: Colors.green.withValues(alpha: 0.1),
                             shape: BoxShape.circle,
                           ),
                           child: const Icon(

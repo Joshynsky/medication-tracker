@@ -16,8 +16,6 @@ class DashboardScreen extends ConsumerStatefulWidget {
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   DateTime _now = DateTime.now();
 
-  final ScrollController _dotsController = ScrollController();
-
   @override
   void initState() {
     super.initState();
@@ -55,10 +53,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     if (med.strengthValue != null &&
         med.strengthUnit != null &&
         med.strengthValue! > 0) {
-      if (med.amountPerDose != null &&
-          med.amountUnit != null &&
-          med.amountPerDose! > 0) {
-        return '${med.strengthValue!.toInt()}${med.strengthUnit} \u00b7 Take ${med.amountPerDose!.toInt()} ${med.amountUnit}';
+      if (med.amountPerDose > 0) {
+        return '${med.strengthValue!.toInt()}${med.strengthUnit} \u00b7 Take ${med.amountPerDose.toInt()} ${med.amountUnit}';
       }
       return '${med.strengthValue!.toInt()}${med.strengthUnit}';
     }
@@ -205,17 +201,17 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
     final inWindow =
         nextDose != null &&
-        _isInWindow(nextDose!.scheduledTime, schedType, intervalH);
+        _isInWindow(nextDose.scheduledTime, schedType, intervalH);
     final pastWindow =
         nextDose != null &&
-        _isPastWindow(nextDose!.scheduledTime, schedType, intervalH);
+        _isPastWindow(nextDose.scheduledTime, schedType, intervalH);
     final diff = nextDose != null
-        ? nextDose!.scheduledTime.difference(_now)
+        ? nextDose.scheduledTime.difference(_now)
         : Duration.zero;
     final allDone = takenInSlot > 0 && pendingInSlot == 0;
     final allCompletedToday = total > 0 && taken >= total;
 
-    final hour = nextDose != null ? nextDose!.scheduledTime.hour : _now.hour;
+    final hour = nextDose != null ? nextDose.scheduledTime.hour : _now.hour;
     final isMorning = hour < 12;
     final isAfternoon = hour >= 12 && hour < 17;
 
@@ -248,10 +244,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       cardSubtitle = 'Next: ${_formatTime(nextDose!.scheduledTime)}';
     } else if (pastWindow && pendingInSlot > 0) {
       cardTitle = 'Missed';
-      cardSubtitle = _formatTime(nextDose!.scheduledTime);
+      cardSubtitle = _formatTime(nextDose.scheduledTime);
     } else if (inWindow) {
       cardTitle = 'Take now';
-      cardSubtitle = _formatTime(nextDose!.scheduledTime);
+      cardSubtitle = _formatTime(nextDose.scheduledTime);
     } else {
       cardTitle = 'Next dose in';
       cardSubtitle = _countdownText(diff);
@@ -302,7 +298,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
-                color: cardColors[0].withOpacity(0.2),
+                color: cardColors[0].withValues(alpha: 0.2),
                 blurRadius: 20,
                 offset: const Offset(0, 8),
               ),
@@ -331,7 +327,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       Text(
                         cardTitle,
                         style: theme.textTheme.titleMedium?.copyWith(
-                          color: Colors.white.withOpacity(0.9),
+                          color: Colors.white.withValues(alpha: 0.9),
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -353,7 +349,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                             vertical: 6,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.25),
+                            color: Colors.white.withValues(alpha: 0.25),
                             borderRadius: BorderRadius.circular(14),
                           ),
                           child: Text(
@@ -375,7 +371,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                             vertical: 6,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.25),
+                            color: Colors.white.withValues(alpha: 0.25),
                             borderRadius: BorderRadius.circular(14),
                           ),
                           child: Text(
@@ -404,7 +400,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                               d.scheduledTime.hour ==
                                   nextDose!.scheduledTime.hour &&
                               d.scheduledTime.minute ==
-                                  nextDose!.scheduledTime.minute,
+                                  nextDose.scheduledTime.minute,
                           orElse: () => nextDose!,
                         );
                         final isTaken = dose.status == 'taken';
@@ -413,12 +409,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
                             color: isTaken
-                                ? Colors.green.withOpacity(0.06)
+                                ? Colors.green.withValues(alpha: 0.06)
                                 : theme.colorScheme.surfaceContainerLow,
                             borderRadius: BorderRadius.circular(14),
                             border: isTaken
                                 ? Border.all(
-                                    color: Colors.green.withOpacity(0.2),
+                                    color: Colors.green.withValues(alpha: 0.2),
                                   )
                                 : null,
                           ),
@@ -429,7 +425,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                 height: 40,
                                 decoration: BoxDecoration(
                                   color: isTaken
-                                      ? Colors.green.withOpacity(0.12)
+                                      ? Colors.green.withValues(alpha: 0.12)
                                       : theme.colorScheme.primaryContainer,
                                   borderRadius: BorderRadius.circular(10),
                                 ),
@@ -527,7 +523,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                         d.scheduledTime.hour ==
                                             nextDose!.scheduledTime.hour &&
                                         d.scheduledTime.minute ==
-                                            nextDose!.scheduledTime.minute &&
+                                            nextDose.scheduledTime.minute &&
                                         d.status == 'pending',
                                   )) {
                                     notifier.snoozeDose(d.id);
@@ -541,7 +537,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                     borderRadius: BorderRadius.circular(14),
                                   ),
                                   side: BorderSide(
-                                    color: Colors.orange.withOpacity(0.5),
+                                    color: Colors.orange.withValues(alpha: 0.5),
                                   ),
                                 ),
                                 child: const Text(
@@ -560,7 +556,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                         d.scheduledTime.hour ==
                                             nextDose!.scheduledTime.hour &&
                                         d.scheduledTime.minute ==
-                                            nextDose!.scheduledTime.minute &&
+                                            nextDose.scheduledTime.minute &&
                                         d.status == 'pending',
                                   )) {
                                     notifier.confirmDose(d.id, d.medicationId);
@@ -587,7 +583,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         Container(
                           padding: const EdgeInsets.all(14),
                           decoration: BoxDecoration(
-                            color: Colors.green.withOpacity(0.08),
+                            color: Colors.green.withValues(alpha: 0.08),
                             borderRadius: BorderRadius.circular(14),
                           ),
                           child: const Row(
@@ -614,7 +610,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         Container(
                           padding: const EdgeInsets.all(14),
                           decoration: BoxDecoration(
-                            color: Colors.red.withOpacity(0.06),
+                            color: Colors.red.withValues(alpha: 0.06),
                             borderRadius: BorderRadius.circular(14),
                           ),
                           child: const Row(
@@ -641,7 +637,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         Container(
                           padding: const EdgeInsets.all(14),
                           decoration: BoxDecoration(
-                            color: Colors.green.withOpacity(0.08),
+                            color: Colors.green.withValues(alpha: 0.08),
                             borderRadius: BorderRadius.circular(14),
                           ),
                           child: const Row(
@@ -755,9 +751,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         vertical: 8,
                       ),
                       decoration: BoxDecoration(
-                        color: c.withOpacity(0.1),
+                        color: c.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: c.withOpacity(0.3)),
+                        border: Border.all(color: c.withValues(alpha: 0.3)),
                       ),
                       child: Row(
                         children: [
