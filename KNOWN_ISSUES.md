@@ -14,12 +14,6 @@ Dot-coloring logic reuses one medication's window size (`schedType`/`intervalH` 
 ### 3. Hardcoded interval in every_x_hours branch
 `getExpectedDoseTimesToday`'s `every_x_hours` branch hardcodes `intervalH = 4` — never reads the medication's actual configured interval. Same root cause as #1 (data lives in `ScheduleTimes`, not `Medication`).
 
-### 4. Duplicated, inconsistent window-size formula
-Two independent copies of the "how wide is the on-time window" calculation exist:
-- Dashboard: `(intervalHours * 60) ~/ 5`
-- `alarm_service.dart::_getWindowMinutes`: `(intervalHours * 60) ~/ 6`
-These disagree — alarms and dashboard can judge the same dose differently.
-
 ## Fixed (found during test-writing, not part of original scope)
 
 ### Timer resource leak in Dashboard and Add Medication wizard
@@ -27,6 +21,9 @@ These disagree — alarms and dashboard can judge the same dose differently.
 
 ### History not refreshing after dose confirmation
 `historyProvider` (a non-autoDispose FutureProvider) only recomputed when `medicationRepositoryProvider` was invalidated — which only happened after `saveMedication`. Confirming/snoozing a dose or deleting a medication goes through a separate `dashboardProvider`/`DashboardNotifier`, which never triggered a History refresh. Since `MainShell` keeps all tabs alive via `IndexedStack`, there's no tab-switch remount to mask it either — a real user confirming a dose and checking History would see stale numbers. Fixed in `lib/providers/dashboard_provider.dart`: `DashboardNotifier` now calls `ref.invalidate(historyProvider)` in `confirmDose`, `snoozeDose`, and `deleteMedication`.
+
+### Duplicated, inconsistent window-size formula (RESOLVED)
+Two independent copies of the "on-time window" calculation existed — dashboard used `÷5`, `alarm_service.dart` used `÷6`, and they disagreed. Consolidated into a single shared `scheduleWindowMinutes()` function in `lib/shared/schedule_window.dart`, using the `÷5` value as the source of truth (chosen deliberately as the more forgiving option, given real-world caregiver/multi-medication use cases where strict windows risk falsely flagging honest lateness as "missed"). `alarm_service.dart` now calls the shared function instead of its own copy. Per-medication configurable windows (e.g. stricter for time-critical medications) remains a known future improvement, not yet built.
 
 ## Housekeeping-tier (not urgent)
 - `go_router` installed but unused (left in place per decision, revisit later).

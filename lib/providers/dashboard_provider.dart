@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/repositories/medication_repository.dart';
 import '../data/local/database.dart';
+import '../features/history/providers/history_provider.dart';
 
 class DashboardState {
   final List<Medication> medications;
@@ -36,8 +37,9 @@ class DashboardState {
 
 class DashboardNotifier extends StateNotifier<DashboardState> {
   final MedicationRepository _repo;
+  final Ref _ref;
 
-  DashboardNotifier(this._repo) : super(const DashboardState()) {
+  DashboardNotifier(this._repo, this._ref) : super(const DashboardState()) {
     refresh();
   }
 
@@ -59,16 +61,19 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
 
   Future<void> confirmDose(int doseId, int medicationId) async {
     await _repo.confirmDose(doseId, medicationId);
+    _ref.invalidate(historyProvider);
     await refresh();
   }
 
   Future<void> snoozeDose(int doseId) async {
     await _repo.snoozeDose(doseId);
+    _ref.invalidate(historyProvider);
     await refresh();
   }
 
   Future<void> deleteMedication(int medicationId) async {
     await _repo.deleteMedication(medicationId);
+    _ref.invalidate(historyProvider);
     await refresh();
   }
 }
@@ -76,5 +81,5 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
 final dashboardProvider =
     StateNotifierProvider<DashboardNotifier, DashboardState>((ref) {
   final repo = ref.read(medicationRepositoryProvider);
-  return DashboardNotifier(repo);
+  return DashboardNotifier(repo, ref);
 });

@@ -1,11 +1,12 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:collection/collection.dart';
 import '../../../providers/dashboard_provider.dart';
 import '../../../data/local/database.dart';
 import '../../../shared/widgets/wave_clipper.dart';
 import '../../add_medication/screens/add_medication_screen.dart';
 import '../../medication_detail/screens/detail_screen.dart';
+import '../dashboard_logic.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -15,17 +16,24 @@ class DashboardScreen extends ConsumerStatefulWidget {
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   DateTime _now = DateTime.now();
+  Timer? _tickTimer;
 
   @override
   void initState() {
     super.initState();
-    Future.delayed(const Duration(seconds: 30), _tick);
+    _tickTimer = Timer(const Duration(seconds: 30), _tick);
+  }
+
+  @override
+  void dispose() {
+    _tickTimer?.cancel();
+    super.dispose();
   }
 
   void _tick() {
     if (mounted) {
       setState(() => _now = DateTime.now());
-      Future.delayed(const Duration(seconds: 30), _tick);
+      _tickTimer = Timer(const Duration(seconds: 30), _tick);
     }
   }
 
@@ -34,13 +42,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     if (hour < 12) return 'Good morning! ☀️';
     if (hour < 17) return 'Good afternoon! 🌤️';
     return 'Good evening! 🌙';
-  }
-
-  String _formatTime(DateTime t) {
-    final h = t.hour > 12 ? t.hour - 12 : (t.hour == 0 ? 12 : t.hour);
-    final m = t.minute.toString().padLeft(2, '0');
-    final am = t.hour < 12 ? 'AM' : 'PM';
-    return '$h:$m $am';
   }
 
   String _countdownText(Duration d) {
@@ -59,70 +60,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       return '${med.strengthValue!.toInt()}${med.strengthUnit}';
     }
     return med.dosage;
-  }
-
-  int _windowMinutes(String scheduleType, int intervalHours) {
-    switch (scheduleType) {
-      case 'every_x_hours':
-        return (intervalHours * 60) ~/ 5;
-      case 'once_daily':
-        return 120;
-      default:
-        return 60;
-    }
-  }
-
-  bool _isInWindow(DateTime t, String scheduleType, int intervalHours) {
-    return t.difference(_now).inMinutes.abs() <=
-        _windowMinutes(scheduleType, intervalHours);
-  }
-
-  bool _isPastWindow(DateTime t, String scheduleType, int intervalHours) {
-    return _now.difference(t).inMinutes >
-        _windowMinutes(scheduleType, intervalHours);
-  }
-
-  List<DateTime> _getExpectedDoseTimesToday(Medication med) {
-    final times = <DateTime>[];
-    final today = DateTime(_now.year, _now.month, _now.day);
-    final tomorrow = today.add(const Duration(days: 1));
-    final startHour = med.startDateTime.hour;
-    final startMinute = med.startDateTime.minute;
-
-    if (med.scheduleType == 'once_daily') {
-      times.add(
-        DateTime(today.year, today.month, today.day, startHour, startMinute),
-      );
-      return times;
-    }
-
-    if (med.scheduleType == 'every_x_hours') {
-      int intervalH = 4; // Default, will be overridden
-      // Calculate backwards from start time to find today's anchor
-      var anchor = med.startDateTime;
-      while (anchor.isAfter(today)) {
-        anchor = anchor.subtract(Duration(hours: intervalH));
-      }
-      while (anchor.add(Duration(hours: intervalH)).isBefore(today) ||
-          anchor.isBefore(today)) {
-        anchor = anchor.add(Duration(hours: intervalH));
-      }
-      // Generate all times for today
-      var d = anchor;
-      while (d.isBefore(tomorrow)) {
-        if (d.isAfter(today) || d == today) {
-          times.add(DateTime(d.year, d.month, d.day, d.hour, d.minute));
-        }
-        d = d.add(Duration(hours: intervalH));
-      }
-      return times;
-    }
-
-    // Default: just the start time
-    times.add(
-      DateTime(today.year, today.month, today.day, startHour, startMinute),
-    );
-    return times;
   }
 
   int _parseTimeToMinutes(String timeStr) {
@@ -201,10 +138,20 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
     final inWindow =
         nextDose != null &&
-        _isInWindow(nextDose.scheduledTime, schedType, intervalH);
+        DashboardLogic.isInWindow(
+          _now,
+          nextDose.scheduledTime,
+          schedType,
+          intervalH,
+        );
     final pastWindow =
         nextDose != null &&
-        _isPastWindow(nextDose.scheduledTime, schedType, intervalH);
+        DashboardLogic.isPastWindow(
+          _now,
+          nextDose.scheduledTime,
+          schedType,
+          intervalH,
+        );
     final diff = nextDose != null
         ? nextDose.scheduledTime.difference(_now)
         : Duration.zero;
@@ -241,42 +188,26 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       cardSubtitle = 'No more doses today';
     } else if (allDone) {
       cardTitle = 'All taken!';
-      cardSubtitle = 'Next: ${_formatTime(nextDose!.scheduledTime)}';
+      cardSubtitle = 'Next: ${DashboardLogic.formatTime(nextDose!.scheduledTime)}';
     } else if (pastWindow && pendingInSlot > 0) {
       cardTitle = 'Missed';
-      cardSubtitle = _formatTime(nextDose.scheduledTime);
+      cardSubtitle = DashboardLogic.formatTime(nextDose.scheduledTime);
     } else if (inWindow) {
       cardTitle = 'Take now';
-      cardSubtitle = _formatTime(nextDose.scheduledTime);
+      cardSubtitle = DashboardLogic.formatTime(nextDose.scheduledTime);
     } else {
       cardTitle = 'Next dose in';
       cardSubtitle = _countdownText(diff);
     }
 
     // Build time dots from expected schedules
-    final timeDots = <String, String>{};
-    for (final med in meds) {
-      final medDoses = doses.where((d) => d.medicationId == med.id).toList();
-      final expectedTimes = _getExpectedDoseTimesToday(med);
-      for (final expectedTime in expectedTimes) {
-        final k = _formatTime(expectedTime);
-        final existingDose = medDoses.firstWhereOrNull(
-          (d) =>
-              d.scheduledTime.hour == expectedTime.hour &&
-              d.scheduledTime.minute == expectedTime.minute,
-        );
-        if (existingDose != null) {
-          if (existingDose.status == 'pending' &&
-              _now.difference(existingDose.scheduledTime).inMinutes >
-                  _windowMinutes(schedType, intervalH)) {
-            // Past window but not taken = missed
-            if (timeDots[k] != 'taken') timeDots[k] = 'missed';
-          } else if (timeDots[k] != 'taken') {
-            timeDots[k] = existingDose.status;
-          }
-        }
-      }
-    }
+    final timeDots = DashboardLogic.computeTimeDots(
+      meds: meds,
+      doses: doses,
+      now: _now,
+      schedType: schedType,
+      intervalH: intervalH,
+    );
     final sortedDots = timeDots.keys.toList()
       ..sort(
         (a, b) => _parseTimeToMinutes(a).compareTo(_parseTimeToMinutes(b)),

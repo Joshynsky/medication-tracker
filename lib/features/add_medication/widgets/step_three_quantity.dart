@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/add_medication_provider.dart';
@@ -12,19 +13,21 @@ class _StepThreeQuantityState extends ConsumerState<StepThreeQuantity> {
   bool _showHelperText = false;
   final _pillController = TextEditingController();
   final _notesController = TextEditingController();
+  Timer? _helperTextTimer;
 
   @override
   void initState() {
     super.initState();
     _pillController.text = ref.read(pillCountProvider);
     _notesController.text = ref.read(notesProvider);
-    Future.delayed(const Duration(seconds: 4), () {
+    _helperTextTimer = Timer(const Duration(seconds: 4), () {
       if (mounted) setState(() => _showHelperText = true);
     });
   }
 
   @override
   void dispose() {
+    _helperTextTimer?.cancel();
     _pillController.dispose();
     _notesController.dispose();
     super.dispose();

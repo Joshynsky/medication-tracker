@@ -1,5 +1,6 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
+import '../shared/schedule_window.dart';
 import 'notification_service.dart';
 
 class AlarmService {
@@ -83,7 +84,7 @@ class AlarmService {
     required String scheduleType,
     required int intervalHours,
   }) async {
-    final windowMins = _getWindowMinutes(scheduleType, intervalHours);
+    final windowMins = scheduleWindowMinutes(scheduleType, intervalHours);
     int alarmId = medicationId * 1000;
 
     for (final time in doseTimes) {
@@ -104,15 +105,6 @@ class AlarmService {
     int alarmId = medicationId * 1000;
     for (int i = 0; i < 60; i++) {
       await NotificationService.cancelNotification(alarmId + i);
-    }
-  }
-
-  static int _getWindowMinutes(String scheduleType, int intervalHours) {
-    switch (scheduleType) {
-      case 'every_x_hours': return (intervalHours * 60) ~/ 6;
-      case 'once_daily': return 120;
-      case 'multiple_times': return 60;
-      default: return 60;
     }
   }
 }
