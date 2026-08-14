@@ -70,7 +70,7 @@ class _StepTwoScheduleState extends ConsumerState<StepTwoSchedule> {
           ),
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
-            value: scheduleType,
+            initialValue: scheduleType,
             decoration: const InputDecoration(
               border: OutlineInputBorder(),
               prefixIcon: Icon(Icons.schedule_outlined),
@@ -103,9 +103,11 @@ class _StepTwoScheduleState extends ConsumerState<StepTwoSchedule> {
 
           const SizedBox(height: 32),
 
-          // Start Date
+          // Start Date -- date only. The actual dose time-of-day always
+          // comes from the picker(s) above, never from this field, so it
+          // only asks for what it actually uses: which day to begin on.
           Text(
-            'Start date & time',
+            'Start date',
             style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w600,
             ),
@@ -121,20 +123,11 @@ class _StepTwoScheduleState extends ConsumerState<StepTwoSchedule> {
                 helpText: 'Select start date',
               );
               if (date != null) {
-                final time = await showTimePicker(
-                  context: context,
-                  initialTime: TimeOfDay.fromDateTime(startDate),
-                  helpText: 'Select start time',
+                ref.read(startDateProvider.notifier).state = DateTime(
+                  date.year,
+                  date.month,
+                  date.day,
                 );
-                if (time != null) {
-                  ref.read(startDateProvider.notifier).state = DateTime(
-                    date.year,
-                    date.month,
-                    date.day,
-                    time.hour,
-                    time.minute,
-                  );
-                }
               }
             },
             child: Container(
@@ -151,7 +144,7 @@ class _StepTwoScheduleState extends ConsumerState<StepTwoSchedule> {
                   ),
                   const SizedBox(width: 12),
                   Text(
-                    '${startDate.day}/${startDate.month}/${startDate.year} at ${startDate.hour.toString().padLeft(2, '0')}:${startDate.minute.toString().padLeft(2, '0')}',
+                    '${startDate.day}/${startDate.month}/${startDate.year}',
                     style: theme.textTheme.bodyLarge,
                   ),
                 ],
@@ -256,6 +249,17 @@ class _StepTwoScheduleState extends ConsumerState<StepTwoSchedule> {
               ),
             ),
             const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _buildIntervalPresetChip('Once daily', 24, intervalHours, ref),
+                _buildIntervalPresetChip('Twice daily', 12, intervalHours, ref),
+                _buildIntervalPresetChip('3x daily', 8, intervalHours, ref),
+                _buildIntervalPresetChip('4x daily', 6, intervalHours, ref),
+              ],
+            ),
+            const SizedBox(height: 12),
             Row(
               children: [
                 SizedBox(
@@ -279,13 +283,23 @@ class _StepTwoScheduleState extends ConsumerState<StepTwoSchedule> {
                   ),
                 ),
                 const SizedBox(width: 12),
-                Text(
-                  'Starting at ${times[0]['hour'].toString().padLeft(2, '0')}:${times[0]['minute'].toString().padLeft(2, '0')}',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
+                const Text('or type a custom interval'),
               ],
+            ),
+            const SizedBox(height: 16),
+            // This is the time the every-X-hours cycle actually starts from
+            // (and repeats from every intervalHours) -- it drives the real
+            // schedule, unlike the date-only "Start date & time" field below.
+            _buildTimePicker(
+              'Starting at',
+              times[0]['hour'] ?? 8,
+              times[0]['minute'] ?? 0,
+              theme,
+              (hour, minute) {
+                ref.read(scheduleTimesProvider.notifier).state = [
+                  {'hour': hour, 'minute': minute},
+                ];
+              },
             ),
           ],
         );
@@ -341,6 +355,21 @@ class _StepTwoScheduleState extends ConsumerState<StepTwoSchedule> {
       default:
         return const SizedBox.shrink();
     }
+  }
+
+  Widget _buildIntervalPresetChip(
+    String label,
+    int hours,
+    int selectedIntervalHours,
+    WidgetRef ref,
+  ) {
+    return ChoiceChip(
+      label: Text('$label ($hours hrs)'),
+      selected: selectedIntervalHours == hours,
+      onSelected: (_) {
+        ref.read(intervalHoursProvider.notifier).state = hours;
+      },
+    );
   }
 
   Widget _buildTimePicker(

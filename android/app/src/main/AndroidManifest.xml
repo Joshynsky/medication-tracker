@@ -6,6 +6,7 @@
     <uses-permission android:name="android.permission.USE_EXACT_ALARM"/>
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
 
     <application
         android:label="MediTrack"
@@ -34,15 +35,18 @@
             </intent-filter>
         </activity>
 
-        <!-- Boot receiver to reschedule alarms after reboot -->
-        <receiver
-            android:name=".AlarmReceiver"
-            android:exported="false" />
-        
+        <!-- Reschedules already-scheduled notifications after a reboot
+             (Android clears AlarmManager's pending alarms on boot). This is
+             the flutter_local_notifications plugin's own receiver; the boot
+             intent-filter below is what actually makes it fire. -->
         <receiver
             android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver"
-            android:exported="false" />
-        
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+            </intent-filter>
+        </receiver>
+
         <receiver
             android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver"
             android:exported="false" />

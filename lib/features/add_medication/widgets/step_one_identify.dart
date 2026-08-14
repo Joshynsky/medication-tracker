@@ -135,7 +135,7 @@ class _StepOneIdentifyState extends ConsumerState<StepOneIdentify> {
             ),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
-              value: form,
+              initialValue: form,
               decoration: const InputDecoration(
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.category_outlined),
@@ -190,7 +190,7 @@ class _StepOneIdentifyState extends ConsumerState<StepOneIdentify> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: DropdownButtonFormField<String>(
-                      value: strengthUnit,
+                      initialValue: strengthUnit,
                       decoration: const InputDecoration(
                         border: OutlineInputBorder(),
                       ),
@@ -203,8 +203,9 @@ class _StepOneIdentifyState extends ConsumerState<StepOneIdentify> {
                           )
                           .toList(),
                       onChanged: (v) {
-                        if (v != null)
+                        if (v != null) {
                           ref.read(strengthUnitProvider.notifier).state = v;
+                        }
                       },
                     ),
                   ),
@@ -246,7 +247,7 @@ class _StepOneIdentifyState extends ConsumerState<StepOneIdentify> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: DropdownButtonFormField<String>(
-                      value: amountUnit,
+                      initialValue: amountUnit,
                       decoration: const InputDecoration(
                         border: OutlineInputBorder(),
                       ),
@@ -262,8 +263,9 @@ class _StepOneIdentifyState extends ConsumerState<StepOneIdentify> {
                           )
                           .toList(),
                       onChanged: (v) {
-                        if (v != null)
+                        if (v != null) {
                           ref.read(amountUnitProvider.notifier).state = v;
+                        }
                       },
                     ),
                   ),

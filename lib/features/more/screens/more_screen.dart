@@ -1,9 +1,40 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../services/alarm_service.dart';
+import '../../../services/notification_service.dart';
 import 'developer_screen.dart';
 
 class MoreScreen extends ConsumerWidget {
   const MoreScreen({super.key});
+
+  /// Lets the user (re-)trigger all reminder-related permission requests --
+  /// useful if they declined during onboarding and want to enable reminders
+  /// later. No dedicated settings screen; this just re-runs the same
+  /// requests onboarding does and reports what happened.
+  Future<void> _requestNotificationPermissions(BuildContext context) async {
+    final notificationsGranted = await NotificationService.requestPermission();
+    final exactAlarmsGranted = await AlarmService.requestExactAlarmPermission();
+    final batteryExemptionGranted =
+        await AlarmService.requestBatteryOptimizationExemption();
+
+    if (!context.mounted) return;
+    final allGranted =
+        notificationsGranted && exactAlarmsGranted && batteryExemptionGranted;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          allGranted
+              ? 'Notifications, exact alarms, and battery restrictions are enabled.'
+              : 'Some permissions were not granted. You can enable them from '
+                  "your device's Settings app under MediTrack. On some "
+                  'phones (e.g. Xiaomi/MIUI), also check "Autostart" under '
+                  'app permissions -- Android has no in-app way to request '
+                  'that one.',
+        ),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -28,7 +59,12 @@ class MoreScreen extends ConsumerWidget {
             ]),
           ),
           const SizedBox(height: 24),
-          _MenuTile(icon: Icons.notifications_outlined, title: 'Notification Settings', subtitle: 'Customize reminder behavior', onTap: () {}),
+          _MenuTile(
+            icon: Icons.notifications_outlined,
+            title: 'Notification Settings',
+            subtitle: 'Enable reminders & exact alarms',
+            onTap: () => _requestNotificationPermissions(context),
+          ),
           _MenuTile(icon: Icons.people_outlined, title: 'Caregiver Mode', subtitle: 'Switch to managing patients', onTap: () {}),
           _MenuTile(icon: Icons.backup_outlined, title: 'Backup & Sync', subtitle: 'Coming soon', onTap: null),
           _MenuTile(icon: Icons.developer_mode, title: 'Developer Tools', subtitle: 'Testing and debugging', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DeveloperScreen()))),

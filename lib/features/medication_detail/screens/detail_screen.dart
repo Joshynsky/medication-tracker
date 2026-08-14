@@ -1,12 +1,37 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/local/database.dart';
+import '../../../data/repositories/medication_repository.dart';
 import '../../../providers/dashboard_provider.dart';
+import '../../add_medication/providers/add_medication_provider.dart';
+import '../../add_medication/screens/add_medication_screen.dart';
 
 class MedicationDetailScreen extends ConsumerWidget {
   final Medication medication;
 
   const MedicationDetailScreen({super.key, required this.medication});
+
+  Future<void> _editMedication(BuildContext context, WidgetRef ref) async {
+    final repository = ref.read(medicationRepositoryProvider);
+    final scheduleTimesByMed = await repository.getScheduleTimesForMedications([
+      medication.id,
+    ]);
+
+    resetAddMedicationState(ref);
+    populateAddMedicationStateForEdit(
+      ref,
+      medication,
+      scheduleTimesByMed[medication.id] ?? [],
+    );
+
+    if (!context.mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AddMedicationScreen(medicationId: medication.id),
+      ),
+    );
+  }
 
   void _deleteMedication(BuildContext context, WidgetRef ref) {
     showDialog(
@@ -71,6 +96,11 @@ class MedicationDetailScreen extends ConsumerWidget {
         title: Text(medication.name),
         centerTitle: true,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.edit_outlined),
+            tooltip: 'Edit',
+            onPressed: () => _editMedication(context, ref),
+          ),
           PopupMenuButton(
             onSelected: (value) { if (value == 'delete') _deleteMedication(context, ref); },
             itemBuilder: (context) => [

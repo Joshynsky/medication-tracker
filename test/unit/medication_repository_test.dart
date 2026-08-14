@@ -55,6 +55,34 @@ void main() {
     });
   });
 
+  group('hasSeenOnboarding / markOnboardingSeen', () {
+    test('is false before the user row exists', () async {
+      expect(await repo.hasSeenOnboarding(), isFalse);
+    });
+
+    test('is false for a freshly-created user', () async {
+      await repo.ensureDefaultUserAndPatient();
+      expect(await repo.hasSeenOnboarding(), isFalse);
+    });
+
+    test('becomes true after markOnboardingSeen, and stays true', () async {
+      await repo.ensureDefaultUserAndPatient();
+
+      await repo.markOnboardingSeen();
+
+      expect(await repo.hasSeenOnboarding(), isTrue);
+      // Calling it again should be harmless and idempotent.
+      await repo.markOnboardingSeen();
+      expect(await repo.hasSeenOnboarding(), isTrue);
+    });
+
+    test('markOnboardingSeen is a no-op if no user row exists yet', () async {
+      await repo.markOnboardingSeen();
+      expect(await repo.hasSeenOnboarding(), isFalse);
+      expect(await db.select(db.users).get(), isEmpty);
+    });
+  });
+
   group('saveMedication', () {
     test('inserts a medication that getMedications then returns', () async {
       final patientId = await repo.ensureDefaultUserAndPatient();
@@ -189,6 +217,137 @@ void main() {
     });
   });
 
+  group('updateMedication', () {
+    test('updates fields and regenerates dose events against the new schedule', () async {
+      final patientId = await repo.ensureDefaultUserAndPatient();
+      final medId = await repo.saveMedication(
+        patientId: patientId,
+        name: 'Amoxicillin',
+        dosage: '500mg',
+        scheduleType: 'once_daily',
+        startDateTime: DateTime(2020, 1, 1, 8, 0),
+        times: [
+          {'hour': 8, 'minute': 0},
+        ],
+        intervalHours: 0,
+        customDays: {},
+      );
+
+      await repo.updateMedication(
+        medicationId: medId,
+        name: 'Amoxicillin',
+        dosage: '500mg',
+        scheduleType: 'every_x_hours',
+        startDateTime: DateTime(2020, 2, 1, 16, 40),
+        times: [
+          {'hour': 16, 'minute': 40},
+        ],
+        intervalHours: 12,
+        customDays: {},
+      );
+
+      final meds = await repo.getMedications(patientId);
+      final updated = meds.singleWhere((m) => m.id == medId);
+      expect(updated.scheduleType, 'every_x_hours');
+
+      final history = await repo.getDoseHistory(medId);
+      // Anchored at 16:40 (not midnight), so the 7-day cutoff (2020-02-08
+      // 00:00) falls between the 13th dose (02-07 16:40) and what would've
+      // been the 14th (02-08 04:40). With a 12h interval, doses alternate
+      // 16:40/04:40 -- what matters is that the FIRST one is exactly the
+      // configured 16:40, not midnight or some other startDateTime-derived
+      // time.
+      expect(history, hasLength(13));
+      final sorted = [...history]
+        ..sort((a, b) => a.scheduledTime.compareTo(b.scheduledTime));
+      expect(sorted.first.scheduledTime, DateTime(2020, 2, 1, 16, 40));
+    });
+
+    test('preserves already-taken doses and their consumed pill count', () async {
+      final patientId = await repo.ensureDefaultUserAndPatient();
+      final medId = await repo.saveMedication(
+        patientId: patientId,
+        name: 'Ibuprofen',
+        dosage: '200mg',
+        scheduleType: 'once_daily',
+        startDateTime: DateTime(2020, 1, 1, 8, 0),
+        totalPills: 21,
+        times: [
+          {'hour': 8, 'minute': 0},
+        ],
+        intervalHours: 0,
+        customDays: {},
+      );
+
+      final firstDose = (await repo.getDoseHistory(medId)).first;
+      await repo.confirmDose(firstDose.id, medId);
+
+      await repo.updateMedication(
+        medicationId: medId,
+        name: 'Ibuprofen',
+        dosage: '200mg',
+        scheduleType: 'once_daily',
+        startDateTime: DateTime(2020, 1, 1, 8, 0),
+        totalPills: 21,
+        times: [
+          {'hour': 9, 'minute': 0}, // changed dosage time
+        ],
+        intervalHours: 0,
+        customDays: {},
+      );
+
+      final history = await repo.getDoseHistory(medId);
+      final taken = history.where((d) => d.status == 'taken');
+      final pending = history.where((d) => d.status == 'pending');
+      expect(taken, hasLength(1), reason: 'the already-taken dose must survive the edit');
+      expect(taken.single.id, firstDose.id);
+      expect(
+        pending,
+        everyElement(predicate<DoseEvent>((d) => d.scheduledTime.hour == 9)),
+        reason: 'newly regenerated pending doses should reflect the edited time',
+      );
+
+      final meds = await repo.getMedications(patientId);
+      final updated = meds.singleWhere((m) => m.id == medId);
+      expect(
+        updated.pillsRemaining,
+        20,
+        reason: '21 total minus the 1 already taken, regardless of the edit',
+      );
+    });
+
+    test('cancels and replaces alarms rather than leaving stale ones scheduled', () async {
+      final patientId = await repo.ensureDefaultUserAndPatient();
+      final medId = await repo.saveMedication(
+        patientId: patientId,
+        name: 'Painkiller',
+        dosage: '200mg',
+        scheduleType: 'once_daily',
+        startDateTime: DateTime(2020, 1, 1, 8, 0),
+        times: [
+          {'hour': 8, 'minute': 0},
+        ],
+        intervalHours: 0,
+        customDays: {},
+      );
+
+      // Should not throw -- exercises the cancel-then-reschedule path against
+      // the fake notification plugin registered by setUpTestNotifications().
+      await repo.updateMedication(
+        medicationId: medId,
+        name: 'Painkiller',
+        dosage: '200mg',
+        scheduleType: 'once_daily',
+        startDateTime: DateTime(2020, 1, 1, 10, 0),
+        times: [
+          {'hour': 10, 'minute': 0},
+        ],
+        intervalHours: 0,
+        customDays: {},
+      );
+    });
+  });
+
   group('getMedications', () {
     test('excludes soft-deleted (inactive) medications', () async {
       final patientId = await repo.ensureDefaultUserAndPatient();
@@ -221,6 +380,56 @@ void main() {
 
       final meds = await repo.getMedications(patientId);
       expect(meds.map((m) => m.id), [keepId]);
+    });
+  });
+
+  group('getScheduleTimesForMedications', () {
+    test('returns each medication\'s own ScheduleTimes rows, keyed by medicationId', () async {
+      final patientId = await repo.ensureDefaultUserAndPatient();
+      final onceDailyId = await repo.saveMedication(
+        patientId: patientId,
+        name: 'Once daily',
+        dosage: '10mg',
+        scheduleType: 'once_daily',
+        startDateTime: DateTime(2020, 1, 1, 8, 0),
+        times: [
+          {'hour': 8, 'minute': 0},
+        ],
+        intervalHours: 0,
+        customDays: {},
+      );
+      final multipleTimesId = await repo.saveMedication(
+        patientId: patientId,
+        name: 'Three times a day',
+        dosage: '20mg',
+        scheduleType: 'multiple_times',
+        startDateTime: DateTime(2020, 1, 1, 8, 0),
+        times: [
+          {'hour': 8, 'minute': 0},
+          {'hour': 14, 'minute': 0},
+          {'hour': 22, 'minute': 0},
+        ],
+        intervalHours: 0,
+        customDays: {},
+      );
+
+      final byMedicationId = await repo.getScheduleTimesForMedications([
+        onceDailyId,
+        multipleTimesId,
+      ]);
+
+      expect(byMedicationId[onceDailyId], hasLength(1));
+      expect(byMedicationId[onceDailyId]!.single.hour, 8);
+      expect(byMedicationId[multipleTimesId], hasLength(3));
+      expect(
+        byMedicationId[multipleTimesId]!.map((s) => s.hour),
+        containsAll([8, 14, 22]),
+      );
+    });
+
+    test('returns an empty map for an empty medicationIds list', () async {
+      final byMedicationId = await repo.getScheduleTimesForMedications([]);
+      expect(byMedicationId, isEmpty);
     });
   });
 
@@ -322,6 +531,38 @@ void main() {
 
       final med = (await repo.getMedications(patientId)).single;
       expect(med.pillsRemaining, 0);
+    });
+  });
+
+  group('snoozeDose', () {
+    test('reschedules a reminder for the dose without changing its status', () async {
+      final patientId = await repo.ensureDefaultUserAndPatient();
+      final medId = await repo.saveMedication(
+        patientId: patientId,
+        name: 'Amoxicillin',
+        dosage: '500mg',
+        scheduleType: 'once_daily',
+        startDateTime: DateTime(2020, 1, 1, 8, 0),
+        times: [
+          {'hour': 8, 'minute': 0},
+        ],
+        intervalHours: 0,
+        customDays: {},
+      );
+      final dose = (await repo.getDoseHistory(medId)).first;
+
+      // Should not throw -- confirms snoozeDose actually does something now
+      // (it used to be a no-op stub).
+      await repo.snoozeDose(dose.id);
+
+      final updated =
+          await (db.select(db.doseEvents)..where((t) => t.id.equals(dose.id))).getSingle();
+      expect(updated.status, 'pending');
+    });
+
+    test('is a no-op for a dose id that does not exist', () async {
+      // Should not throw.
+      await repo.snoozeDose(999999);
     });
   });
 

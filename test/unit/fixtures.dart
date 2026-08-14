@@ -45,6 +45,30 @@ Medication buildMedication({
   );
 }
 
+/// Builds a [ScheduleTime] row directly (no DB round-trip) for pure-logic
+/// unit tests. Mirrors what `MedicationRepository.saveMedication` actually
+/// writes: `intervalHours` is only ever set for `every_x_hours` schedules,
+/// `daysOfWeek` only for `custom` schedules.
+ScheduleTime buildScheduleTime({
+  int id = 1,
+  required int medicationId,
+  int? hour,
+  int? minute,
+  int? intervalHours,
+  String? daysOfWeek,
+  DateTime? createdAt,
+}) {
+  return ScheduleTime(
+    id: id,
+    medicationId: medicationId,
+    hour: hour,
+    minute: minute,
+    intervalHours: intervalHours,
+    daysOfWeek: daysOfWeek,
+    createdAt: createdAt ?? DateTime(2020, 1, 1),
+  );
+}
+
 /// Builds a [DoseEvent] row directly (no DB round-trip) for pure-logic
 /// unit tests.
 DoseEvent buildDoseEvent({

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../providers/dashboard_provider.dart';
 import '../../../data/local/database.dart';
 import '../../../shared/widgets/wave_clipper.dart';
+import '../../add_medication/providers/add_medication_provider.dart';
 import '../../add_medication/screens/add_medication_screen.dart';
 import '../../medication_detail/screens/detail_screen.dart';
 import '../dashboard_logic.dart';
@@ -62,6 +63,64 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     return med.dosage;
   }
 
+  /// Picks which dose the hero card represents. [doses] must already be
+  /// sorted ascending by scheduledTime.
+  ///
+  /// Previously this just grabbed the first pending dose within a flat,
+  /// hardcoded 60-minute window -- with per-medication window sizes now
+  /// as small as 5-30 minutes (see schedule_window.dart), a dose could sit
+  /// well past its own window (and thus visually "missed") while still
+  /// satisfying that stale 60-minute check, permanently blocking a later,
+  /// more relevant dose (including one already confirmed taken) from ever
+  /// being shown. Found via manual testing: a 5:45 dose stayed pinned as
+  /// "missed" on the hero card even after a separate 6:45 dose was added,
+  /// became due, and was confirmed taken.
+  DoseEvent? _selectNextDose(
+    List<DoseEvent> doses,
+    List<Medication> meds,
+    Map<int, List<ScheduleTime>> scheduleTimesByMedicationId,
+  ) {
+    bool inOwnWindow(DoseEvent d) {
+      Medication? med;
+      try {
+        med = meds.firstWhere((m) => m.id == d.medicationId);
+      } catch (_) {
+        return false;
+      }
+      final scheduleTimes = scheduleTimesByMedicationId[med.id] ?? const [];
+      final intervalH = med.scheduleType == 'every_x_hours'
+          ? DashboardLogic.intervalHoursForEveryXHours(scheduleTimes)
+          : 0;
+      final minutesOfDay = med.scheduleType == 'multiple_times'
+          ? DashboardLogic.minutesOfDayFor(scheduleTimes)
+          : const <int>[];
+      return DashboardLogic.isInWindow(
+        _now,
+        d.scheduledTime,
+        med.scheduleType,
+        intervalH,
+        minutesOfDay,
+      );
+    }
+
+    final pending = doses.where((d) => d.status == 'pending').toList();
+
+    // Tier 1: earliest dose currently within its own actionable window.
+    for (final d in pending) {
+      if (inOwnWindow(d)) return d;
+    }
+    // Tier 2: soonest upcoming dose (window not open yet).
+    for (final d in pending) {
+      if (d.scheduledTime.isAfter(_now)) return d;
+    }
+    // Tier 3: nothing current or upcoming -- fall back to whichever pending
+    // dose was due most recently, not the oldest/first one chronologically.
+    if (pending.isNotEmpty) return pending.last;
+    // Tier 4: no pending doses at all -- show the most recent dose of any
+    // status, so the card still has something to display.
+    return doses.isNotEmpty ? doses.last : null;
+  }
+
   int _parseTimeToMinutes(String timeStr) {
     final parts = timeStr.split(' ');
     final timeParts = parts[0].split(':');
@@ -86,6 +145,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
     final meds = dashState.medications;
     final doses = dashState.todaysDoses;
+    final scheduleTimesByMedicationId = dashState.scheduleTimesByMedicationId;
     final taken = dashState.takenCount;
     final total = dashState.totalCount;
     final remaining = dashState.remainingCount;
@@ -93,27 +153,21 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
     doses.sort((a, b) => a.scheduledTime.compareTo(b.scheduledTime));
 
-    DoseEvent? nextDose;
-    try {
-      nextDose = doses.firstWhere(
-        (d) =>
-            d.status == 'pending' &&
-            _now.difference(d.scheduledTime).inMinutes < 60,
-      );
-    } catch (_) {
-      try {
-        nextDose = doses.firstWhere((d) => d.status == 'pending');
-      } catch (_) {
-        if (doses.isNotEmpty) nextDose = doses.first;
-      }
-    }
+    final nextDose = _selectNextDose(doses, meds, scheduleTimesByMedicationId);
 
     String schedType = 'once_daily';
-    int intervalH = 12;
+    int intervalH = 0;
+    List<int> minutesOfDay = const [];
     if (nextDose != null && meds.isNotEmpty) {
       try {
-        final m = meds.firstWhere((x) => x.id == nextDose!.medicationId);
+        final m = meds.firstWhere((x) => x.id == nextDose.medicationId);
         schedType = m.scheduleType;
+        final medScheduleTimes = scheduleTimesByMedicationId[m.id] ?? const [];
+        if (schedType == 'every_x_hours') {
+          intervalH = DashboardLogic.intervalHoursForEveryXHours(medScheduleTimes);
+        } else if (schedType == 'multiple_times') {
+          minutesOfDay = DashboardLogic.minutesOfDayFor(medScheduleTimes);
+        }
       } catch (_) {}
     }
 
@@ -123,7 +177,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       final slot = doses
           .where(
             (d) =>
-                d.scheduledTime.hour == nextDose!.scheduledTime.hour &&
+                d.scheduledTime.hour == nextDose.scheduledTime.hour &&
                 d.scheduledTime.minute == nextDose.scheduledTime.minute,
           )
           .toList();
@@ -143,6 +197,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           nextDose.scheduledTime,
           schedType,
           intervalH,
+          minutesOfDay,
         );
     final pastWindow =
         nextDose != null &&
@@ -151,6 +206,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           nextDose.scheduledTime,
           schedType,
           intervalH,
+          minutesOfDay,
         );
     final diff = nextDose != null
         ? nextDose.scheduledTime.difference(_now)
@@ -205,8 +261,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       meds: meds,
       doses: doses,
       now: _now,
-      schedType: schedType,
-      intervalH: intervalH,
+      scheduleTimesByMedicationId: scheduleTimesByMedicationId,
     );
     final sortedDots = timeDots.keys.toList()
       ..sort(
@@ -452,7 +507,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                   for (final d in doses.where(
                                     (d) =>
                                         d.scheduledTime.hour ==
-                                            nextDose!.scheduledTime.hour &&
+                                            nextDose.scheduledTime.hour &&
                                         d.scheduledTime.minute ==
                                             nextDose.scheduledTime.minute &&
                                         d.status == 'pending',
@@ -485,7 +540,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                   for (final d in doses.where(
                                     (d) =>
                                         d.scheduledTime.hour ==
-                                            nextDose!.scheduledTime.hour &&
+                                            nextDose.scheduledTime.hour &&
                                         d.scheduledTime.minute ==
                                             nextDose.scheduledTime.minute &&
                                         d.status == 'pending',
@@ -817,10 +872,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       appBar: AppBar(title: const Text('MediTrack'), centerTitle: true),
       body: body,
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const AddMedicationScreen()),
-        ).then((_) => notifier.refresh()),
+        onPressed: () {
+          resetAddMedicationState(ref);
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const AddMedicationScreen()),
+          ).then((_) => notifier.refresh());
+        },
         icon: const Icon(Icons.add),
         label: const Text('Add Medication'),
       ),

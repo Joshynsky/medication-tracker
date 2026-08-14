@@ -23,18 +23,18 @@ class StepPreview extends ConsumerWidget {
     final notes = ref.watch(notesProvider);
     final theme = Theme.of(context);
 
-    String _dosageText() {
+    String dosageText() {
       final parts = <String>[];
       if (strengthValue.isNotEmpty && strengthUnit.isNotEmpty) {
         parts.add('$strengthValue$strengthUnit');
       }
       if (amountPerDose.isNotEmpty && amountUnit.isNotEmpty) {
-        parts.add('Take ${amountPerDose} ${amountUnit}');
+        parts.add('Take $amountPerDose $amountUnit');
       }
       return parts.join(' · ');
     }
 
-    String _formLabel() {
+    String formLabel() {
       switch (form) {
         case 'pills': return '💊 Pills';
         case 'liquid': return '💧 Liquid';
@@ -63,16 +63,16 @@ class StepPreview extends ConsumerWidget {
               const SizedBox(width: 16),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(name.isEmpty ? 'Unnamed medication' : name, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                if (_dosageText().isNotEmpty) Text(_dosageText(), style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                if (dosageText().isNotEmpty) Text(dosageText(), style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
                 const SizedBox(height: 4),
-                Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2), decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(8)), child: Text(_formLabel(), style: theme.textTheme.labelSmall)),
+                Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2), decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(8)), child: Text(formLabel(), style: theme.textTheme.labelSmall)),
               ])),
             ]),
             const SizedBox(height: 20), const Divider(), const SizedBox(height: 20),
 
             _PreviewRow(icon: Icons.schedule, label: 'Schedule', value: _buildScheduleText(scheduleType, times, intervalHours, customDays)),
             const SizedBox(height: 12),
-            _PreviewRow(icon: Icons.calendar_today, label: 'Starts', value: '${startDate.day}/${startDate.month}/${startDate.year} at ${_formatTime(startDate)}'),
+            _PreviewRow(icon: Icons.calendar_today, label: 'Starts', value: '${startDate.day}/${startDate.month}/${startDate.year}'),
             const SizedBox(height: 12),
             if (pillCount.isNotEmpty) ...[
               _PreviewRow(icon: Icons.inventory_2, label: 'Quantity', value: '$pillCount $quantityUnit'),
@@ -96,12 +96,6 @@ class StepPreview extends ConsumerWidget {
         const SizedBox(height: 32),
       ]),
     );
-  }
-
-  String _formatTime(DateTime d) {
-    final h = d.hour > 12 ? d.hour - 12 : (d.hour == 0 ? 12 : d.hour);
-    final am = d.hour < 12 ? 'AM' : 'PM';
-    return '${h.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')} $am';
   }
 
   String _buildScheduleText(String scheduleType, List<Map<String, int>> times, int intervalHours, Set<String> customDays) {

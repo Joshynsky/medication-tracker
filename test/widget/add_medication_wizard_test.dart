@@ -47,7 +47,7 @@ void main() {
     expect(find.text('Step 2 of 3'), findsOneWidget);
     expect(find.text('When do you take it?'), findsOneWidget);
     expect(find.text('Schedule type'), findsOneWidget);
-    expect(find.text('Start date & time'), findsOneWidget);
+    expect(find.text('Start date'), findsOneWidget);
   });
 
   testWidgets('Step 3 (Quantity): step indicator shows 3 of 3 and quantity fields are present', (

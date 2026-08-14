@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 class NotificationService {
@@ -21,7 +22,14 @@ class NotificationService {
     importance: Importance.high,
   );
 
-  static Future<void> init() async {
+  /// [onNotificationResponse] is invoked when the user taps a notification
+  /// or one of its action buttons. It's injected rather than hardcoded here
+  /// so this service stays free of app-specific logic (parsing payloads,
+  /// confirming/snoozing doses) -- see NotificationActionHandler, wired up
+  /// from main().
+  static Future<void> init({
+    required void Function(NotificationResponse) onNotificationResponse,
+  }) async {
     const AndroidInitializationSettings androidSettings =
         AndroidInitializationSettings('@mipmap/ic_launcher');
 
@@ -31,7 +39,7 @@ class NotificationService {
 
     await _plugin.initialize(
       settings,
-      onDidReceiveNotificationResponse: _onNotificationTap,
+      onDidReceiveNotificationResponse: onNotificationResponse,
     );
 
     // Create channels
@@ -63,14 +71,14 @@ class NotificationService {
           actions: [
             const AndroidNotificationAction(
               'take_dose',
-              'I took them',
+              'Take',
               showsUserInterface: true,
               cancelNotification: true,
             ),
             const AndroidNotificationAction(
               'snooze_dose',
               'Snooze 10 min',
-              showsUserInterface: false,
+              showsUserInterface: true,
               cancelNotification: true,
             ),
           ],
@@ -101,7 +109,7 @@ class NotificationService {
           actions: [
             const AndroidNotificationAction(
               'take_dose',
-              'I took them',
+              'Take',
               showsUserInterface: true,
               cancelNotification: true,
             ),
@@ -112,15 +120,27 @@ class NotificationService {
     );
   }
 
+  /// Requests the POST_NOTIFICATIONS runtime permission (Android 13+; a
+  /// no-op returning true on older versions). Shows the in-app system
+  /// dialog -- only call this from an explicit user action (onboarding, or
+  /// More > Notification Settings), not automatically at startup.
+  static Future<bool> requestPermission() async {
+    final androidPlugin = _plugin
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>();
+    if (androidPlugin == null) return false;
+    try {
+      return await androidPlugin.requestNotificationsPermission() ?? false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
   static Future<void> cancelNotification(int id) async {
     await _plugin.cancel(id);
   }
 
   static Future<void> cancelAll() async {
     await _plugin.cancelAll();
-  }
-
-  static void _onNotificationTap(NotificationResponse response) {
-    // Handled in app.dart via notification tap stream
   }
 }

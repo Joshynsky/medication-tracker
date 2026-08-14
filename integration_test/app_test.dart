@@ -30,7 +30,7 @@ void main() {
     'add medication -> appears on dashboard -> confirm dose -> reflected in history',
     (tester) async {
       tz_data.initializeTimeZones();
-      await NotificationService.init();
+      await NotificationService.init(onNotificationResponse: (_) {});
 
       final db = AppDatabase.forTesting(NativeDatabase.memory());
       addTearDown(db.close);
@@ -110,16 +110,35 @@ void main() {
       await tester.tap(find.text('Save'));
       await tester.pumpAndSettle();
 
+      // This is the first (and, for this test, only) medication ever saved,
+      // so NotificationPermissionDialog.showIfNeeded shows the onboarding
+      // dialog here -- it's barrierDismissible: false and _saveMedication
+      // awaits it before popping back to the Dashboard, so nothing below
+      // this point works until it's dismissed. Tap "Not now" rather than
+      // "Enable Notifications": that button calls into the real native
+      // Android permission dialog, which lives outside the Flutter engine
+      // entirely -- integration_test has no way to find or dismiss it, so
+      // tapping it would just hang. Real permission-dialog behavior isn't
+      // testable here regardless of which button we pick.
+      expect(find.text('Stay on track with reminders'), findsOneWidget);
+      await tester.tap(find.text('Not now'));
+      await tester.pumpAndSettle();
+
       // --- Confirm it appears on the Dashboard ---
 
       expect(find.text('No medications yet'), findsNothing);
       expect(find.text('Amoxicillin'), findsAtLeastNWidgets(1));
 
       // The "Amoxicillin saved!" SnackBar is still on screen at this point
-      // (pumpAndSettle only waits for its entrance animation, not its ~4s
-      // display + exit) and can intercept taps on whatever's underneath it.
-      // Let it finish before interacting with the screen further.
-      await tester.pump(const Duration(seconds: 5));
+      // and can intercept taps on whatever's underneath it. Its Overlay
+      // entry stays hit-testable (fading out) for a bit even after the
+      // SnackBar widget itself is gone from the tree, so neither a fixed
+      // wait nor polling find.byType(SnackBar) is reliable here. Use
+      // ScaffoldMessenger's own API to dismiss it outright instead of
+      // guessing at timing.
+      tester
+          .state<ScaffoldMessengerState>(find.byType(ScaffoldMessenger))
+          .hideCurrentSnackBar();
       await tester.pumpAndSettle();
 
       // once_daily generates 7 days of dose events; only today's is
@@ -147,11 +166,14 @@ void main() {
 
       // Trigger a dashboard refresh the way the app itself does: navigate
       // into the medication's detail screen and back.
-      await tester.scrollUntilVisible(
-        find.text('Amoxicillin').last,
-        200,
-        scrollable: find.byType(Scrollable).first,
-      );
+      //
+      // ensureVisible (not scrollUntilVisible) deliberately: scrollUntilVisible
+      // stops as soon as the target is merely hit-testable, which can leave it
+      // sitting right at the viewport edge, close enough to the FAB/bottom nav
+      // area to intermittently fail the tap below. ensureVisible computes the
+      // scroll offset needed to fully reveal the widget instead.
+      await tester.ensureVisible(find.text('Amoxicillin').last);
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Amoxicillin').last);
       await tester.pumpAndSettle();
       expect(find.byType(MedicationDetailScreen), findsOneWidget);

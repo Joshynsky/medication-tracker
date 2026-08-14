@@ -6,12 +6,14 @@ import '../features/history/providers/history_provider.dart';
 class DashboardState {
   final List<Medication> medications;
   final List<DoseEvent> todaysDoses;
+  final Map<int, List<ScheduleTime>> scheduleTimesByMedicationId;
   final bool isLoading;
   final String? error;
 
   const DashboardState({
     this.medications = const [],
     this.todaysDoses = const [],
+    this.scheduleTimesByMedicationId = const {},
     this.isLoading = true,
     this.error,
   });
@@ -19,12 +21,15 @@ class DashboardState {
   DashboardState copyWith({
     List<Medication>? medications,
     List<DoseEvent>? todaysDoses,
+    Map<int, List<ScheduleTime>>? scheduleTimesByMedicationId,
     bool? isLoading,
     String? error,
   }) {
     return DashboardState(
       medications: medications ?? this.medications,
       todaysDoses: todaysDoses ?? this.todaysDoses,
+      scheduleTimesByMedicationId:
+          scheduleTimesByMedicationId ?? this.scheduleTimesByMedicationId,
       isLoading: isLoading ?? this.isLoading,
       error: error,
     );
@@ -49,9 +54,13 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
       final patientId = await _repo.ensureDefaultUserAndPatient();
       final medications = await _repo.getMedications(patientId);
       final todaysDoses = await _repo.getTodaysDoses(patientId);
+      final scheduleTimesByMedicationId = await _repo.getScheduleTimesForMedications(
+        medications.map((m) => m.id).toList(),
+      );
       state = state.copyWith(
         medications: medications,
         todaysDoses: todaysDoses,
+        scheduleTimesByMedicationId: scheduleTimesByMedicationId,
         isLoading: false,
       );
     } catch (e) {

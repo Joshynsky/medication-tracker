@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../services/alarm_service.dart';
 import '../../../services/notification_service.dart';
 import '../../../data/repositories/medication_repository.dart';
 
@@ -39,16 +40,16 @@ class DeveloperScreen extends ConsumerWidget {
             icon: Icons.timer,
             title: 'Send Test Notification (10 sec)',
             subtitle: 'Fires in 10 seconds (leave the app to see it)',
-            onTap: () {
+            onTap: () async {
               final scheduledTime = DateTime.now().add(const Duration(seconds: 10));
               final tzTime = tz.TZDateTime.from(scheduledTime, tz.local);
 
-              FlutterLocalNotificationsPlugin().zonedSchedule(
-                9999,
-                '⏰ Scheduled Test',
-                'This notification was scheduled 10 seconds ago',
-                tzTime,
-                const NotificationDetails(
+              await AlarmService.zonedScheduleWithFallback(
+                id: 9999,
+                title: '⏰ Scheduled Test',
+                body: 'This notification was scheduled 10 seconds ago',
+                scheduledDate: tzTime,
+                details: const NotificationDetails(
                   android: AndroidNotificationDetails(
                     'dose_reminders',
                     'Dose Reminders',
@@ -57,12 +58,13 @@ class DeveloperScreen extends ConsumerWidget {
                     priority: Priority.high,
                   ),
                 ),
-                androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-                uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+                payload: '{}',
               );
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Notification scheduled! Close the app and wait 10 seconds.')),
-              );
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Notification scheduled! Close the app and wait 10 seconds.')),
+                );
+              }
             },
           ),
           const SizedBox(height: 24),
@@ -150,7 +152,7 @@ class DeveloperScreen extends ConsumerWidget {
                         await repo.resetAllData();
                         Navigator.pop(ctx);
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: const Text('All data has been reset! Restart the app.')),
+                          const SnackBar(content: Text('All data has been reset! Restart the app.')),
                         );
                       },
                       style: FilledButton.styleFrom(backgroundColor: Colors.red),
